@@ -2,74 +2,935 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
-    output   = "../generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
 }
 
 datasource db {
-    provider = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    createdBy   User   @relation(fields: [createdById], references: [id])
-    createdById String
-
-    @@index([name])
-}
+// ============================================================================
+// AUTHENTICATION
+// ============================================================================
 
 // Necessary for Next auth
 model Account {
-    id                       String  @id @default(cuid())
-    userId                   String
-    type                     String
-    provider                 String
-    providerAccountId        String
-    refresh_token            String? // @db.Text
-    access_token             String? // @db.Text
-    expires_at               Int?
-    token_type               String?
-    scope                    String?
-    id_token                 String? // @db.Text
-    session_state            String?
-    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    refresh_token_expires_in Int?
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? // @db.Text
+  access_token             String? // @db.Text
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String? // @db.Text
+  session_state            String?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh_token_expires_in Int?
 
-    @@unique([provider, providerAccountId])
+  @@unique([provider, providerAccountId])
 }
 
 model Session {
-    id           String   @id @default(cuid())
-    sessionToken String   @unique
-    userId       String
-    expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model User {
-    id            String    @id @default(cuid())
-    name          String?
-    email         String?   @unique
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
-    posts         Post[]
+  id                  String            @id @default(cuid())
+  name                String?
+  email               String?           @unique
+  emailVerified       DateTime?
+  image               String?
+  accounts            Account[]
+  sessions            Session[]
+  system_role         SystemRole        @default(LEADER)
+  invitation_status   InvitationStatus?
+  invitation_token    String?           @unique
+  invitation_sent_at  DateTime?
+  pending_group_id    Int?
+  pending_system_role SystemRole?
+  person_id           Int               @unique
+  person              Person            @relation(fields: [person_id], references: [id])
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  // Relations for created/updated records
+  created_scout_groups       ScoutGroup[]       @relation("CreatedScoutGroups")
+  updated_scout_groups       ScoutGroup[]       @relation("UpdatedScoutGroups")
+  created_people             Person[]           @relation("CreatedPeople")
+  updated_people             Person[]           @relation("UpdatedPeople")
+  created_units              Unit[]             @relation("CreatedUnits")
+  updated_units              Unit[]             @relation("UpdatedUnits")
+  created_camps              Camp[]             @relation("CreatedCamps")
+  updated_camps              Camp[]             @relation("UpdatedCamps")
+  created_allergies          Allergy[]          @relation("CreatedAllergies")
+  updated_allergies          Allergy[]          @relation("UpdatedAllergies")
+  created_medical_infos      MedicalInfo[]      @relation("CreatedMedicalInfos")
+  updated_medical_infos      MedicalInfo[]      @relation("UpdatedMedicalInfos")
+  created_ingredients        Ingredient[]       @relation("CreatedIngredients")
+  updated_ingredients        Ingredient[]       @relation("UpdatedIngredients")
+  created_dishes             Dish[]             @relation("CreatedDishes")
+  updated_dishes             Dish[]             @relation("UpdatedDishes")
+  created_utensils           Utensil[]          @relation("CreatedUtensils")
+  updated_utensils           Utensil[]          @relation("UpdatedUtensils")
+  created_transports         Transport[]        @relation("CreatedTransports")
+  updated_transports         Transport[]        @relation("UpdatedTransports")
+  created_accommodations     Accommodation[]    @relation("CreatedAccommodations")
+  updated_accommodations     Accommodation[]    @relation("UpdatedAccommodations")
+  created_activities         Activity[]         @relation("CreatedActivities")
+  updated_activities         Activity[]         @relation("UpdatedActivities")
+  created_providers          Provider[]         @relation("CreatedProviders")
+  updated_providers          Provider[]         @relation("UpdatedProviders")
+  created_budgets            Budget[]           @relation("CreatedBudgets")
+  updated_budgets            Budget[]           @relation("UpdatedBudgets")
+  created_tasks              Task[]             @relation("CreatedTasks")
+  updated_tasks              Task[]             @relation("UpdatedTasks")
+  created_emergency_contacts EmergencyContact[] @relation("CreatedEmergencyContacts")
+  updated_emergency_contacts EmergencyContact[] @relation("UpdatedEmergencyContacts")
+  created_camp_menus         CampMenu[]         @relation("CreatedCampMenus")
+  updated_camp_menus         CampMenu[]         @relation("UpdatedCampMenus")
+
+  @@map("users")
 }
 
 model VerificationToken {
-    identifier String
-    token      String   @unique
-    expires    DateTime
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-    @@unique([identifier, token])
+  @@unique([identifier, token])
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum SystemRole {
+  SUPERADMIN
+  GROUP_ADMIN
+  UNIT_ADMIN
+  LEADER
+  HELPER
+  GUARDIAN
+  MEMBER
+}
+
+enum ScoutBranch {
+  CUBS
+  SWALLOWS
+  MIXED_PACK
+  MIXED_FLOCK
+  SCOUTS
+  GUIDES
+  MIXED_TROOP
+  VENTURERS
+  ROVERS
+  MIXED_VENTURE_UNIT
+  CLAN
+  LEADERSHIP
+  HELPERS
+}
+
+enum GroupRole {
+  MEMBER
+  LEADER
+  GROUP_DIRECTOR
+  HELPER
+  GUARDIAN
+}
+
+enum UnitRole {
+  LEADER
+  ASSISTANT
+  MEMBER
+}
+
+enum AllergySeverity {
+  MILD
+  MODERATE
+  SEVERE
+  CRITICAL
+}
+
+enum MedicalInfoType {
+  CHRONIC_CONDITION
+  MEDICATION
+  PHYSICAL_RESTRICTION
+  DISABILITY
+  OTHER
+}
+
+enum VehicleType {
+  CAR
+  TRUCK
+  BUS
+  MINIBUS
+  VAN
+  OTHER
+}
+
+enum AccommodationType {
+  TENT
+  CABIN
+  SHELTER
+  OTHER
+}
+
+enum UtensilCategory {
+  KITCHEN
+  SCOUT_MATERIAL
+  CAMPING
+  FIRST_AID
+  TOOLS
+  LIGHTING
+  FUEL
+  OTHER
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+  OTHER
+}
+
+enum UtensilStatus {
+  EXCELLENT
+  GOOD
+  FAIR
+  NEEDS_MAINTENANCE
+  UNAVAILABLE
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ChecklistStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum InvitationStatus {
+  PENDING
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+// ============================================================================
+// MAIN MODELS
+// ============================================================================
+
+model ScoutGroup {
+  id              Int       @id @default(autoincrement())
+  name            String    @unique
+  number          Int?
+  district        String?
+  zone            String?
+  address         String?
+  phone           String?
+  group_email     String?
+  is_mixed        Boolean   @default(false)
+  foundation_date DateTime? @db.Date
+  primary_color   Float?
+  secondary_color Float?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedScoutGroups", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedScoutGroups", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  members     PersonGroup[]
+  camps       Camp[]
+  units       Unit[]
+  utensils    Utensil[]
+  providers   Provider[]
+  ingredients Ingredient[]
+  dishes      Dish[]
+
+  @@map("scout_groups")
+}
+
+model Person {
+  id                Int       @id @default(autoincrement())
+  full_name         String
+  phone             String?
+  emergency_contact String?
+  birth_date        DateTime? @db.Date
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedPeople", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedPeople", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  groups                         PersonGroup[]
+  user                           User?
+  camp_participations            CampParticipation[]
+  allergies                      Allergy[]
+  medical_info                   MedicalInfo[]
+  units                          UnitAssistant[]
+  assigned_tasks                 Task[]
+  led_activities                 Activity[]
+  responsible_for_accommodations Accommodation[]
+  guardians                      PersonGuardian[]    @relation("ChildToGuardian")
+  children                       PersonGuardian[]    @relation("GuardianToChild")
+
+  @@map("people")
+}
+
+model Unit {
+  id       Int         @id @default(autoincrement())
+  name     String
+  branch   ScoutBranch
+  group_id Int
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedUnits", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedUnits", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  group      ScoutGroup      @relation(fields: [group_id], references: [id])
+  members    UnitAssistant[]
+  activities ActivityUnit[]
+
+  @@map("units")
+}
+
+model Camp {
+  id         Int      @id @default(autoincrement())
+  name       String
+  location   String
+  start_date DateTime @db.Date
+  end_date   DateTime @db.Date
+  fee_cost   Float    @default(0.0)
+  group_id   Int
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedCamps", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedCamps", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  group               ScoutGroup          @relation(fields: [group_id], references: [id])
+  camp_participations CampParticipation[]
+  menus               CampMenu[]
+  transports          Transport[]
+  accommodations      Accommodation[]
+  activities          Activity[]
+  budget              Budget?
+  tasks               Task[]
+  emergency_contacts  EmergencyContact[]
+
+  @@map("camps")
+}
+
+// ============================================================================
+// ASSOCIATION TABLES (Many-to-Many)
+// ============================================================================
+
+model PersonGroup {
+  person_id   Int
+  group_id    Int
+  group_role  GroupRole
+  assigned_at DateTime   @default(now())
+  person      Person     @relation(fields: [person_id], references: [id], onDelete: Cascade)
+  group       ScoutGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@id([person_id, group_id])
+  @@map("person_groups")
+}
+
+model UnitAssistant {
+  unit_id      Int
+  assistant_id Int
+  role         UnitRole @default(MEMBER)
+  assigned_at  DateTime @default(now())
+  unit         Unit     @relation(fields: [unit_id], references: [id])
+  assistant    Person   @relation(fields: [assistant_id], references: [id])
+
+  @@id([unit_id, assistant_id])
+  @@map("unit_assistants")
+}
+
+model ActivityUnit {
+  activity_id Int
+  unit_id     Int
+  assigned_at DateTime @default(now())
+  activity    Activity @relation(fields: [activity_id], references: [id])
+  unit        Unit     @relation(fields: [unit_id], references: [id])
+
+  @@id([activity_id, unit_id])
+  @@map("activity_units")
+}
+
+model PersonGuardian {
+  child_id        Int
+  guardian_id     Int
+  relationship    String?
+  is_main_contact Boolean  @default(false)
+  assigned_at     DateTime @default(now())
+  child           Person   @relation("ChildToGuardian", fields: [child_id], references: [id])
+  guardian        Person   @relation("GuardianToChild", fields: [guardian_id], references: [id])
+
+  @@id([child_id, guardian_id])
+  @@map("person_guardians")
+}
+
+model CampParticipation {
+  person_id                 Int
+  camp_id                   Int
+  payment_made              Boolean                   @default(false)
+  registration_date         DateTime                  @default(now())
+  is_camp_director          Boolean                   @default(false)
+  is_emergency_driver       Boolean                   @default(false)
+  has_first_aid_kit         Boolean                   @default(false)
+  person                    Person                    @relation(fields: [person_id], references: [id])
+  camp                      Camp                      @relation(fields: [camp_id], references: [id])
+  transport_assignments     TransportAssignment[]
+  accommodation_assignments AccommodationAssignment[]
+
+  @@id([person_id, camp_id])
+  @@map("participations")
+}
+
+// ============================================================================
+// HEALTH PROFILE
+// ============================================================================
+
+model Allergy {
+  id           Int              @id @default(autoincrement())
+  person_id    Int
+  name         String
+  description  String?
+  severity     AllergySeverity?
+  observations String?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedAllergies", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedAllergies", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  person Person @relation(fields: [person_id], references: [id])
+
+  @@map("allergies")
+}
+
+model MedicalInfo {
+  id           Int             @id @default(autoincrement())
+  person_id    Int
+  type         MedicalInfoType
+  description  String
+  medications  String?
+  restrictions String?
+  observations String?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedMedicalInfos", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedMedicalInfos", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  person Person @relation(fields: [person_id], references: [id])
+
+  @@map("medical_info")
+}
+
+// ============================================================================
+// FOOD
+// ============================================================================
+
+model Ingredient {
+  id                 Int     @id @default(autoincrement())
+  name               String
+  category           String?
+  unit_of_measure    String  @default("kg")
+  common_allergens   String?
+  is_common_allergen Boolean @default(false)
+  description        String?
+  observations       String?
+  group_id           Int
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedIngredients", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedIngredients", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  group            ScoutGroup        @relation(fields: [group_id], references: [id])
+  dish_ingredients DishIngredient[]
+  prices           IngredientPrice[]
+
+  @@unique([name, group_id])
+  @@map("ingredients")
+}
+
+model Dish {
+  id                   Int       @id @default(autoincrement())
+  name                 String
+  description          String?
+  meal_type            MealType?
+  base_servings        Int       @default(4)
+  instructions         String?
+  preparation_time_min Int?
+  difficulty           String?
+  present_allergens    String?
+  group_id             Int
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedDishes", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedDishes", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  group       ScoutGroup       @relation(fields: [group_id], references: [id])
+  ingredients DishIngredient[]
+  menu_items  CampMenu[]
+  utensils    DishUtensil[]
+
+  @@unique([name, group_id])
+  @@map("dishes")
+}
+
+model DishIngredient {
+  id            Int        @id @default(autoincrement())
+  dish_id       Int
+  ingredient_id Int
+  quantity      Float      @default(1.0)
+  unit          String
+  observations  String?
+  dish          Dish       @relation(fields: [dish_id], references: [id])
+  ingredient    Ingredient @relation(fields: [ingredient_id], references: [id])
+
+  @@map("dish_ingredients")
+}
+
+model CampMenu {
+  id                 Int      @id @default(autoincrement())
+  camp_id            Int
+  dish_id            Int
+  date               DateTime @db.Date
+  meal_type          MealType
+  estimated_time     String?
+  number_of_servings Int      @default(1)
+  observations       String?
+  activity_id        Int?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedCampMenus", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedCampMenus", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  camp     Camp      @relation(fields: [camp_id], references: [id])
+  dish     Dish      @relation(fields: [dish_id], references: [id])
+  activity Activity? @relation(fields: [activity_id], references: [id])
+
+  @@map("camp_menus")
+}
+
+// ============================================================================
+// UTENSILS
+// ============================================================================
+
+model Utensil {
+  id                 Int             @id @default(autoincrement())
+  name               String
+  category           UtensilCategory
+  description        String?
+  available_quantity Int             @default(1)
+  unit_of_measure    String?
+  status             UtensilStatus?
+  location           String?
+  acquisition_date   DateTime?       @db.Date
+  observations       String?
+  group_id           Int?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedUtensils", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedUtensils", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  group         ScoutGroup?   @relation(fields: [group_id], references: [id])
+  dish_utensils DishUtensil[]
+
+  @@map("utensils")
+}
+
+model DishUtensil {
+  id              Int     @id @default(autoincrement())
+  dish_id         Int
+  utensil_id      Int
+  quantity_needed Int     @default(1)
+  is_mandatory    Boolean @default(true)
+  observations    String?
+  dish            Dish    @relation(fields: [dish_id], references: [id])
+  utensil         Utensil @relation(fields: [utensil_id], references: [id])
+
+  @@map("dish_utensils")
+}
+
+// ============================================================================
+// TRANSPORT, ACCOMMODATION, ACTIVITIES
+// ============================================================================
+
+model Transport {
+  id                 Int         @id @default(autoincrement())
+  camp_id            Int
+  type               VehicleType
+  name               String
+  passenger_capacity Int
+  license_plate      String?
+  driver_name        String?
+  driver_phone       String?
+  driver_email       String?
+  departure_time     String?
+  departure_location String?
+  arrival_time       String?
+  arrival_location   String?
+  observations       String?
+  cost               Float?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedTransports", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedTransports", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  camp        Camp                  @relation(fields: [camp_id], references: [id])
+  assignments TransportAssignment[]
+
+  @@map("transports")
+}
+
+model TransportAssignment {
+  id                      Int               @id @default(autoincrement())
+  participation_person_id Int
+  participation_camp_id   Int
+  transport_id            Int
+  seat_order              Int?
+  observations            String?
+  transport               Transport         @relation(fields: [transport_id], references: [id])
+  participation           CampParticipation @relation(fields: [participation_person_id, participation_camp_id], references: [person_id, camp_id])
+
+  @@map("transport_assignments")
+}
+
+model Accommodation {
+  id                    Int               @id @default(autoincrement())
+  camp_id               Int
+  type                  AccommodationType
+  name                  String
+  capacity              Int
+  description           String?
+  location              String?
+  leader_responsible_id Int?
+  observations          String?
+  cost                  Float?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedAccommodations", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedAccommodations", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  camp               Camp                      @relation(fields: [camp_id], references: [id])
+  assignments        AccommodationAssignment[]
+  leader_responsible Person?                   @relation(fields: [leader_responsible_id], references: [id])
+
+  @@map("accommodations")
+}
+
+model AccommodationAssignment {
+  id                      Int       @id @default(autoincrement())
+  participation_person_id Int
+  participation_camp_id   Int
+  accommodation_id        Int
+  check_in_date           DateTime? @db.Date
+  check_out_date          DateTime? @db.Date
+  observations            String?
+
+  // Relations
+  accommodation Accommodation     @relation(fields: [accommodation_id], references: [id])
+  participation CampParticipation @relation(fields: [participation_person_id, participation_camp_id], references: [person_id, camp_id])
+
+  @@map("accommodation_assignments")
+}
+
+model Activity {
+  id                    Int      @id @default(autoincrement())
+  camp_id               Int
+  name                  String
+  description           String?
+  type                  String?
+  date                  DateTime @db.Date
+  start_time            String?
+  duration_minutes      Int?
+  end_time              String?
+  location              String?
+  leader_responsible_id Int?
+  materials_needed      String?
+  difficulty            String?
+  recommended_weather   String?
+  observations          String?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedActivities", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedActivities", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  camp               Camp           @relation(fields: [camp_id], references: [id])
+  leader_responsible Person?        @relation(fields: [leader_responsible_id], references: [id])
+  menu_items         CampMenu[]
+  units              ActivityUnit[]
+
+  @@map("activities")
+}
+
+// ============================================================================
+// COSTS AND BUDGETS
+// ============================================================================
+
+model Provider {
+  id             Int     @id @default(autoincrement())
+  name           String
+  type           String?
+  address        String?
+  phone          String?
+  email          String?
+  contact_person String?
+  description    String?
+  observations   String?
+  group_id       Int?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedProviders", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedProviders", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  group             ScoutGroup?       @relation(fields: [group_id], references: [id])
+  ingredient_prices IngredientPrice[]
+
+  @@map("providers")
+}
+
+model IngredientPrice {
+  id               Int        @id @default(autoincrement())
+  ingredient_id    Int
+  provider_id      Int
+  unit_price       Float
+  update_date      DateTime   @default(now()) @db.Date
+  is_current_price Boolean    @default(true)
+  observations     String?
+  ingredient       Ingredient @relation(fields: [ingredient_id], references: [id])
+  provider         Provider   @relation(fields: [provider_id], references: [id])
+
+  @@map("ingredient_prices")
+}
+
+model Budget {
+  id                           Int     @id @default(autoincrement())
+  camp_id                      Int     @unique
+  name                         String?
+  estimated_food_cost          Float   @default(0.0)
+  estimated_transport_cost     Float   @default(0.0)
+  estimated_accommodation_cost Float   @default(0.0)
+  estimated_other_cost         Float   @default(0.0)
+  actual_food_cost             Float   @default(0.0)
+  actual_transport_cost        Float   @default(0.0)
+  actual_accommodation_cost    Float   @default(0.0)
+  actual_other_cost            Float   @default(0.0)
+  estimated_total              Float   @default(0.0)
+  actual_total                 Float   @default(0.0)
+  observations                 String?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedBudgets", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedBudgets", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  camp  Camp         @relation(fields: [camp_id], references: [id])
+  items BudgetItem[]
+
+  @@map("budgets")
+}
+
+enum BudgetItemType {
+  FOOD
+  TRANSPORT
+  ACCOMMODATION
+  OTHER
+}
+
+model BudgetItem {
+  id                 Int            @id @default(autoincrement())
+  budget_id          Int
+  type               BudgetItemType
+  quantity           Float          @default(1.0)
+  unit_price         Float
+  total_price        Float
+  actual_total_price Float?
+  ingredient_id      Int?
+  provider_id        Int?
+  transport_id       Int?
+  accommodation_id   Int?
+  observations       String?
+  budget             Budget         @relation(fields: [budget_id], references: [id])
+
+  @@map("budget_items")
+}
+
+// ============================================================================
+// TASKS AND CHECKLIST
+// ============================================================================
+
+model Task {
+  id                    Int          @id @default(autoincrement())
+  camp_id               Int
+  title                 String
+  description           String?
+  category              String?
+  status                TaskStatus   @default(PENDING)
+  priority              TaskPriority @default(MEDIUM)
+  due_date              DateTime?    @db.Date
+  completed_at          DateTime?    @db.Date
+  assigned_to_person_id Int?
+  notes_on_completion   String?
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedTasks", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedTasks", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  camp               Camp    @relation(fields: [camp_id], references: [id])
+  assigned_to_person Person? @relation(fields: [assigned_to_person_id], references: [id])
+
+  @@map("tasks")
+}
+
+model EmergencyContact {
+  id                Int     @id @default(autoincrement())
+  camp_id           Int
+  name              String
+  type              String
+  relationship      String?
+  phone             String
+  alternative_phone String?
+  email             String?
+  address           String?
+  location          String?
+  office_hours      String?
+  specialty         String?
+  observations      String?
+  is_primary        Boolean @default(false)
+
+  // Audit
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    User?     @relation("CreatedEmergencyContacts", fields: [creator_id], references: [person_id])
+  creator_id Int?
+  updater    User?     @relation("UpdatedEmergencyContacts", fields: [updater_id], references: [person_id])
+  updater_id Int?
+
+  // Relations
+  camp Camp @relation(fields: [camp_id], references: [id])
+
+  @@map("emergency_contacts")
 }

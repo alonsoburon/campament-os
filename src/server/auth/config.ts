@@ -1,6 +1,10 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import {
+  type Adapter,
+  type AdapterUser,
+} from "next-auth/adapters";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
-import DiscordProvider from "next-auth/providers/discord";
+import GoogleProvider from "next-auth/providers/google";
 
 import { db } from "~/server/db";
 
@@ -30,21 +34,64 @@ declare module "next-auth" {
  *
  * @see https://next-auth.js.org/configuration/options
  */
+const AUTHORIZED_EMAIL = "nuxapower@gmail.com";
+
+type SignInCallback = NonNullable<
+  NonNullable<NextAuthConfig["callbacks"]>["signIn"]
+>;
+
+type SignInCallbackParams = Parameters<SignInCallback>[0];
+
+const baseAdapter = PrismaAdapter(db);
+
+const adapter: Adapter = {
+  ...baseAdapter,
+  async createUser(data) {
+    const fullName =
+      data.name ??
+      data.email ??
+      "Usuario sin nombre";
+
+    const user = await db.user.create({
+      data: {
+        ...data,
+        person: {
+          create: {
+            full_name: fullName,
+          },
+        },
+      },
+    });
+
+    return user as AdapterUser;
+  },
+};
+
 export const authConfig = {
   providers: [
-    DiscordProvider,
-    /**
-     * ...add more providers here.
-     *
-     * Most other providers require a bit more work than the Discord provider. For example, the
-     * GitHub provider requires you to add the `refresh_token_expires_in` field to the Account
-     * model. Refer to the NextAuth.js docs for the provider you want to use. Example:
-     *
-     * @see https://next-auth.js.org/providers/github
-     */
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET
+    })
   ],
-  adapter: PrismaAdapter(db),
+  adapter,
   callbacks: {
+    async signIn({ account, profile }: SignInCallbackParams) {
+      if (account?.provider !== "google") {
+        return false;
+      }
+
+      const email = typeof profile?.email === "string" ? profile.email : undefined;
+      const emailVerified =
+        typeof profile?.email_verified === "boolean" ? profile.email_verified : false;
+
+      // Solo permitimos el acceso al correo autorizado y verificado.
+      if (!emailVerified || email !== AUTHORIZED_EMAIL) {
+        return false;
+      }
+
+      return true;
+    },
     session: ({ session, user }) => ({
       ...session,
       user: {
