@@ -1,6 +1,123 @@
-@import "tailwindcss";
+/* src/styles/globals.css */
 
-@theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ... (todas tus variables :root se mantienen exactamente igual) ... */
+    --background: oklch(0.985 0 0);
+    --foreground: oklch(0.125 0 0);
+    --card: #ffffff;
+    --card-foreground: oklch(0.125 0 0);
+    --popover: #ffffff;
+    --popover-foreground: oklch(0.125 0 0);
+    --primary: oklch(0.42 0.08 45);
+    --primary-foreground: #ffffff;
+    --secondary: oklch(0.92 0.02 45);
+    --secondary-foreground: oklch(0.22 0.05 45);
+    --positive: oklch(0.48 0.14 142);
+    --positive-foreground: #ffffff;
+    --negative: oklch(0.5 0.21 27);
+    --negative-foreground: #ffffff;
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.439 0 0);
+    --accent: oklch(0.94 0.04 142);
+    --accent-foreground: oklch(0.26 0.08 142);
+    --destructive: oklch(0.5 0.21 27);
+    --destructive-foreground: #ffffff;
+    --border: oklch(0.922 0 0);
+    --input-background: oklch(0.97 0 0);
+    --ring: oklch(0.42 0.08 45);
+    --radius: 0.625rem;
+    --transition: 0.2s ease-in-out;
+    --ff: "Manrope", sans-serif;
+    --h1: 700 1.5rem/1.2em var(--ff);
+    --h2: 700 1.25rem/1.4em var(--ff);
+    --h3: 700 1.125rem/1.4em var(--ff);
+    --p: 400 1rem/1.6em var(--ff);
+    --small: 400 0.75rem/1.6em var(--ff);
+    --shadow-s: inset 0 1px 2px #ffffff30, 0 1px 2px #00000030, 0 2px 4px #00000015;
+    --shadow-m: inset 0 1px 2px #ffffff50, 0 2px 4px #00000030, 0 4px 8px #00000015;
+    --shadow-l: inset 0 1px 2px #ffffff70, 0 4px 6px #00000030, 0 6px 10px #00000015;
+  }
+
+  .dark {
+    /* ... (todas tus variables .dark se mantienen exactamente igual) ... */
+    --background: oklch(0.125 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.175 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.175 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.5 0.09 45);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.235 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --positive: oklch(0.58 0.15 142);
+    --positive-foreground: oklch(0.985 0 0);
+    --negative: oklch(0.58 0.22 27);
+    --negative-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.235 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.235 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.58 0.22 27);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.235 0 0);
+    --input-background: oklch(0.235 0 0);
+    --ring: oklch(0.5 0.09 45);
+    --shadow-s: inset 0 1px 2px #00000030, 0 1px 2px #ffffff10, 0 2px 4px #00000015;
+    --shadow-m: inset 0 1px 2px #00000050, 0 2px 4px #ffffff10, 0 4px 8px #00000015;
+    --shadow-l: inset 0 1px 2px #00000070, 0 4px 6px #ffffff10, 0 6px 10px #00000015;
+  }
+
+  /* ==========================================================================
+     Estilos Base para Elementos Globales (VERSIÓN FINAL Y ROBUSTA)
+     ========================================================================== */
+  
+  * {
+    border-color: var(--border);
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "rlig" 1, "calt" 1;
+    max-width: min(90vw, 1200px);
+    margin: 1rem auto;
+  }
+
+  h1, h2, h3 {
+    color: var(--foreground);
+  }
+  h1 { font: var(--h1); }
+  h2 { font: var(--h2); }
+  h3 { font: var(--h3); }
+
+  p {
+    font: var(--p);
+    color: var(--muted-foreground);
+  }
+
+  small, .small {
+    font: var(--small);
+  }
+
+  a {
+    color: var(--foreground);
+    background-color: var(--secondary);
+    border-radius: var(--radius); /* Podemos usar @apply aquí porque --radius no define una clase */
+    padding: 0.5rem 1rem;
+    text-decoration: none;
+    transition: var(--transition);
+  }
+  a:hover {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
 }
