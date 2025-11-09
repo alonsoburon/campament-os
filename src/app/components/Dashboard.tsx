@@ -1,6 +1,4 @@
 "use client";
-
-import type { CSSProperties } from "react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -59,22 +57,16 @@ export function Dashboard({ currentModule }: DashboardProps) {
       </header>
 
       <section className="grid gap-4">
-        <Alert className="border-[var(--color-negative-500)] bg-[var(--color-negative-50)] text-[var(--color-negative-900)]">
-          <AlertTriangle
-            className="h-4 w-4"
-            style={{ color: "var(--color-negative-600)" }}
-          />
+        <Alert className="border-negative-500 bg-negative-50 text-negative-900">
+          <AlertTriangle className="h-4 w-4 text-negative-600" />
           <AlertTitle>Alertas de salud</AlertTitle>
           <AlertDescription>
             3 participantes requieren atención especial para el próximo
             campamento.
           </AlertDescription>
         </Alert>
-        <Alert className="border-[var(--color-primary-500)] bg-[var(--color-primary-50)] text-[var(--color-primary-900)]">
-          <DollarSign
-            className="h-4 w-4"
-            style={{ color: "var(--color-primary-600)" }}
-          />
+        <Alert className="border-secondary-500 bg-secondary-50 text-secondary-900">
+          <DollarSign className="h-4 w-4 text-secondary-600" />
           <AlertTitle>Pagos pendientes</AlertTitle>
           <AlertDescription>
             12 pagos pendientes por un total de $4,850 USD.
@@ -88,73 +80,58 @@ export function Dashboard({ currentModule }: DashboardProps) {
             title: "Próximos campamentos",
             value: "3",
             description: "En los próximos 30 días",
-            icon: (
-              <CalendarIcon
-                className="h-5 w-5"
-                style={{ color: "var(--color-primary-600)" }}
-              />
-            ),
-            borderColor: "var(--color-primary-600)",
+            Icon: CalendarIcon,
+            iconClass: "text-secondary-600",
+            borderClass: "border-secondary-600",
           },
           {
             title: "Participantes activos",
             value: "287",
             description: (
               <>
-                <span style={{ color: "var(--color-positive-600)" }}>+12%</span> vs
-                mes anterior
+                <span className="text-positive-600">+12%</span> vs mes anterior
               </>
             ),
-            icon: (
-              <UsersIcon
-                className="h-5 w-5"
-                style={{ color: "var(--color-secondary-600)" }}
-              />
-            ),
-            borderColor: "var(--color-secondary-600)",
+            Icon: UsersIcon,
+            iconClass: "text-positive-600",
+            borderClass: "border-positive-600",
           },
           {
             title: "Tareas críticas",
             value: "8",
             description: "2 vencen en 48 horas",
-            icon: (
-              <AlertCircle
-                className="h-5 w-5"
-                style={{ color: "var(--color-neutral-700)" }}
-              />
-            ),
-            borderColor: "var(--color-neutral-600)",
+            Icon: AlertCircle,
+            iconClass: "text-neutral-700",
+            borderClass: "border-neutral-600",
           },
           {
             title: "Presupuesto actual",
             value: "$24,500",
             description: "85% del presupuesto anual",
-            icon: (
-              <TrendingUp
-                className="h-5 w-5"
-                style={{ color: "var(--color-primary-700)" }}
-              />
-            ),
-            borderColor: "var(--color-primary-700)",
+            Icon: TrendingUp,
+            iconClass: "text-secondary-700",
+            borderClass: "border-secondary-700",
           },
-        ].map((metric) => (
-          <Card
-            key={metric.title}
-            className="border-l-4"
-            style={{ borderLeftColor: metric.borderColor }}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base">{metric.title}</CardTitle>
-              {metric.icon}
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">{metric.value}</div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {metric.description}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+        ].map((metric) => {
+          const Icon = metric.Icon;
+          return (
+            <Card
+              key={metric.title}
+              className={`border-l-4 ${metric.borderClass}`}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base">{metric.title}</CardTitle>
+                <Icon className={`h-5 w-5 ${metric.iconClass}`} />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold">{metric.value}</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {metric.description}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
@@ -172,21 +149,21 @@ export function Dashboard({ currentModule }: DashboardProps) {
                 date: "15-17 Nov 2025",
                 participants: 45,
                 status: "Confirmado",
-                color: "var(--color-primary-600)",
+                iconClass: "text-secondary-600",
               },
               {
                 name: "Salida de Patrulla",
                 date: "22-24 Nov 2025",
                 participants: 12,
                 status: "Planificación",
-                color: "var(--color-primary-600)",
+                iconClass: "text-secondary-600",
               },
               {
                 name: "Campamento Navideño",
                 date: "20-22 Dic 2025",
                 participants: 67,
                 status: "Confirmado",
-                color: "var(--color-primary-600)",
+                iconClass: "text-secondary-600",
               },
             ].map((camp) => (
               <div
@@ -196,8 +173,7 @@ export function Dashboard({ currentModule }: DashboardProps) {
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-2">
                     <CalendarIcon
-                      className="h-4 w-4"
-                      style={{ color: camp.color }}
+                      className={`h-4 w-4 ${camp.iconClass}`}
                     />
                     <span className="font-medium">{camp.name}</span>
                   </div>
@@ -214,11 +190,6 @@ export function Dashboard({ currentModule }: DashboardProps) {
                 </div>
                 <Badge
                   variant={camp.status === "Confirmado" ? "default" : "secondary"}
-                  style={
-                    camp.status === "Confirmado"
-                      ? { backgroundColor: camp.color, color: "white" }
-                      : undefined
-                  }
                 >
                   {camp.status}
                 </Badge>
@@ -241,28 +212,32 @@ export function Dashboard({ currentModule }: DashboardProps) {
                 module: "Transporte",
                 priority: "Alta",
                 dueDate: "En 2 días",
-                color: "var(--color-secondary-600)",
+            iconClass: "text-secondary-600",
+            badgeClass: "border-secondary-600 text-secondary-600",
               },
               {
                 title: "Revisar alergias participantes",
                 module: "Salud",
                 priority: "Alta",
                 dueDate: "En 3 días",
-                color: "var(--color-negative-600)",
+            iconClass: "text-negative-600",
+            badgeClass: "border-negative-600 text-negative-600",
               },
               {
                 title: "Planificar menús campamento",
                 module: "Alimentación",
                 priority: "Media",
                 dueDate: "En 5 días",
-                color: "var(--color-primary-700)",
+            iconClass: "text-secondary-700",
+            badgeClass: "border-secondary-700 text-secondary-700",
               },
               {
                 title: "Verificar equipamiento",
                 module: "Inventario",
                 priority: "Media",
                 dueDate: "En 1 semana",
-                color: "var(--color-neutral-600)",
+            iconClass: "text-neutral-600",
+            badgeClass: "border-neutral-600 text-neutral-600",
               },
             ].map((task) => (
               <div
@@ -271,16 +246,13 @@ export function Dashboard({ currentModule }: DashboardProps) {
               >
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-2">
-                    <CheckCircle
-                      className="h-4 w-4"
-                      style={{ color: task.color }}
-                    />
+                <CheckCircle className={`h-4 w-4 ${task.iconClass}`} />
                     <span className="font-medium">{task.title}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                     <Badge
                       variant="outline"
-                      style={{ borderColor: task.color, color: task.color }}
+                  className={task.badgeClass}
                     >
                       {task.module}
                     </Badge>
@@ -308,35 +280,23 @@ export function Dashboard({ currentModule }: DashboardProps) {
           </CardHeader>
           <CardContent className="space-y-5">
             {[
-              { name: "Campamentos", progress: 85, color: "var(--color-primary-600)" },
-              { name: "Personas", progress: 92, color: "var(--color-secondary-600)" },
-              { name: "Inventario", progress: 65, color: "var(--color-neutral-600)" },
-              { name: "Alimentación", progress: 78, color: "var(--color-primary-700)" },
-              { name: "Transporte", progress: 70, color: "var(--color-secondary-700)" },
-              { name: "Alojamiento", progress: 73, color: "var(--color-primary-500)" },
-              { name: "Salud", progress: 88, color: "var(--color-negative-600)" },
-              { name: "Tareas", progress: 60, color: "var(--color-neutral-700)" },
-            ].map((module) => {
-              const progressStyle = {
-                "--progress-background": module.color,
-              } as React.CSSProperties;
-
-              return (
-                <div key={module.name}>
-                  <div className="mb-2 flex items-center justify-between text-sm font-medium">
-                    <span>{module.name}</span>
-                    <span className="text-muted-foreground">
-                      {module.progress}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={module.progress}
-                    className="h-2"
-                    style={progressStyle as React.CSSProperties}
-                  />
-                </div>
-              );
-            })}
+          { name: "Campamentos", progress: 85 },
+          { name: "Personas", progress: 92 },
+          { name: "Inventario", progress: 65 },
+          { name: "Alimentación", progress: 78 },
+          { name: "Transporte", progress: 70 },
+          { name: "Alojamiento", progress: 73 },
+          { name: "Salud", progress: 88 },
+          { name: "Tareas", progress: 60 },
+        ].map((module) => (
+          <div key={module.name}>
+            <div className="mb-2 flex items-center justify-between text-sm font-medium">
+              <span>{module.name}</span>
+              <span className="text-muted-foreground">{module.progress}%</span>
+            </div>
+            <Progress value={module.progress} className="h-2" />
+          </div>
+        ))}
           </CardContent>
         </Card>
       </section>

@@ -52,7 +52,10 @@ function TooltipContent({
         {...props}
       >
         {children}
-        <TooltipPrimitive.Arrow className="bg-primary fill-primary z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
+        <TooltipPrimitive.Arrow
+          className="bg-primary fill-primary z-50 size-2.5 rotate-45 rounded-[2px]"
+          style={{ transform: "translate(-50%, calc(-50% - 2px)) rotate(45deg)" }}
+        />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   );

@@ -1,30 +1,68 @@
 "use client";
 
 import * as React from "react";
+import type { Session } from "next-auth";
 
 import { ColorSystemPreview } from "./ColorSystemPreview";
 import { Dashboard } from "./Dashboard";
+import { PageHeader } from "./PageHeader";
 import { Sidebar } from "./Sidebar";
 
 const DEFAULT_MODULE = "inicio";
 
-export function AppShell() {
+type AppShellProps = {
+  session: Session | null;
+  signInAction: () => Promise<void>;
+  signOutAction: () => Promise<void>;
+};
+
+export function AppShell({
+  session,
+  signInAction,
+  signOutAction,
+}: AppShellProps) {
   const [currentModule, setCurrentModule] =
     React.useState<string>(DEFAULT_MODULE);
   const [showColorSystem, setShowColorSystem] = React.useState<boolean>(true);
 
-  return (
-    <div className="flex min-h-[calc(100vh-5.5rem)] w-full bg-muted/20">
-      <Sidebar
-        currentModule={currentModule}
-        onModuleChange={setCurrentModule}
-        onToggleColorSystem={() =>
-          setShowColorSystem((previous) => !previous)
-        }
-        showColorSystem={showColorSystem}
-      />
+  const currentTitle = React.useMemo(() => {
+    if (showColorSystem) {
+      return "Sistema de colores";
+    }
 
-      <main className="flex flex-1 flex-col overflow-y-auto bg-background text-foreground">
+    return currentModule === "inicio"
+      ? "Panel general"
+      : currentModule.replace(/-/g, " ");
+  }, [currentModule, showColorSystem]);
+
+  return (
+    <div className="app-shell-container">
+      {/* Sidebar - Fixed position with floating effect */}
+      <aside className="app-shell-sidebar">
+        <Sidebar
+          currentModule={currentModule}
+          onModuleChange={setCurrentModule}
+          onToggleColorSystem={() =>
+            setShowColorSystem((previous) => !previous)
+          }
+          showColorSystem={showColorSystem}
+        />
+      </aside>
+
+      {/* Top Bar - Fixed position with floating effect */}
+      <header className="app-shell-topbar">
+        <PageHeader
+          title={currentTitle}
+          badgeLabel="Versión Alpha"
+          description="CapamentOS prioriza información clara y organizada para que administres tus campamentos sin distracciones."
+          session={session}
+          signInAction={signInAction}
+          signOutAction={signOutAction}
+        />
+      </header>
+
+      {/* Main Content - Floating container with rounded corners */}
+      <main className="app-shell-content">
         {showColorSystem ? (
           <ColorSystemPreview onClose={() => setShowColorSystem(false)} />
         ) : (
@@ -34,4 +72,3 @@ export function AppShell() {
     </div>
   );
 }
-

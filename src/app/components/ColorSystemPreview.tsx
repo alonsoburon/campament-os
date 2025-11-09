@@ -13,12 +13,86 @@ import {
   CardTitle,
 } from "./ui/card";
 
+const COLOR_VALUES = {
+  primary: {
+    50: "oklch(0.96 0.02 45)",
+    100: "oklch(0.9 0.04 45)",
+    200: "oklch(0.82 0.06 45)",
+    300: "oklch(0.72 0.08 45)",
+    400: "oklch(0.62 0.09 45)",
+    500: "oklch(0.52 0.09 45)",
+    600: "oklch(0.42 0.08 45)",
+    700: "oklch(0.32 0.07 45)",
+    800: "oklch(0.24 0.06 45)",
+    900: "oklch(0.18 0.05 45)",
+    950: "oklch(0.14 0.04 45)",
+  },
+  secondary: {
+    50: "oklch(0.96 0.01 45)",
+    100: "oklch(0.92 0.02 45)",
+    200: "oklch(0.84 0.04 45)",
+    300: "oklch(0.72 0.06 45)",
+    400: "oklch(0.6 0.08 45)",
+    500: "oklch(0.5 0.09 45)",
+    600: "oklch(0.42 0.08 45)",
+    700: "oklch(0.35 0.07 45)",
+    800: "oklch(0.28 0.06 45)",
+    900: "oklch(0.22 0.05 45)",
+    950: "oklch(0.17 0.04 45)",
+  },
+  positive: {
+    50: "oklch(0.97 0.02 142)",
+    100: "oklch(0.94 0.04 142)",
+    200: "oklch(0.88 0.08 142)",
+    300: "oklch(0.78 0.12 142)",
+    400: "oklch(0.68 0.14 142)",
+    500: "oklch(0.58 0.15 142)",
+    600: "oklch(0.48 0.14 142)",
+    700: "oklch(0.4 0.12 142)",
+    800: "oklch(0.32 0.1 142)",
+    900: "oklch(0.26 0.08 142)",
+    950: "oklch(0.2 0.06 142)",
+  },
+  negative: {
+    50: "oklch(0.97 0.02 27)",
+    100: "oklch(0.94 0.05 27)",
+    200: "oklch(0.88 0.1 27)",
+    300: "oklch(0.78 0.16 27)",
+    400: "oklch(0.68 0.2 27)",
+    500: "oklch(0.58 0.22 27)",
+    600: "oklch(0.5 0.21 27)",
+    700: "oklch(0.42 0.18 27)",
+    800: "oklch(0.34 0.15 27)",
+    900: "oklch(0.28 0.12 27)",
+    950: "oklch(0.22 0.09 27)",
+  },
+  neutral: {
+    50: "oklch(0.985 0 0)",
+    100: "oklch(0.97 0 0)",
+    200: "oklch(0.922 0 0)",
+    300: "oklch(0.832 0 0)",
+    400: "oklch(0.708 0 0)",
+    500: "oklch(0.571 0 0)",
+    600: "oklch(0.439 0 0)",
+    700: "oklch(0.336 0 0)",
+    800: "oklch(0.235 0 0)",
+    900: "oklch(0.175 0 0)",
+    950: "oklch(0.125 0 0)",
+  },
+} as const;
+
+type Shade = keyof typeof COLOR_VALUES.primary;
+
+const SHADES = [
+  50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950,
+] as Shade[];
+
 type ColorScale = {
   name: string;
   description: string;
   prefix: string;
-  shades: number[];
-  semantic: string;
+  shades: Shade[];
+  semantic: keyof typeof COLOR_VALUES;
 };
 
 type SemanticToken = {
@@ -33,35 +107,28 @@ const COLOR_SCALES: ColorScale[] = [
     description:
       "Brand principal · Acciones destacadas, enlaces y estados activos.",
     prefix: "primary",
-    shades: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950],
+    shades: SHADES,
     semantic: "primary",
-  },
-  {
-    name: "Secondary",
-    description: "Apoyo visual · Fondos sutiles, tarjetas y elementos de contraste.",
-    prefix: "secondary",
-    shades: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950],
-    semantic: "secondary",
   },
   {
     name: "Positive",
     description: "Estados de éxito · Confirmaciones, KPIs favorables, badges positivos.",
     prefix: "positive",
-    shades: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950],
+    shades: SHADES,
     semantic: "positive",
   },
   {
     name: "Negative",
     description: "Alertas y errores · Mensajes críticos, indicadores de riesgo.",
     prefix: "negative",
-    shades: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950],
+    shades: SHADES,
     semantic: "negative",
   },
   {
     name: "Neutral",
     description: "Grises · Tipografía, bordes, fondos neutrales.",
     prefix: "neutral",
-    shades: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950],
+    shades: SHADES,
     semantic: "neutral",
   },
 ];
@@ -126,11 +193,11 @@ export function ColorSystemPreview({ onClose }: ColorSystemPreviewProps) {
         </div>
       </header>
 
-      <Card className="border-2" style={{ borderColor: "var(--color-primary-500)" }}>
+      <Card className="border-2" style={{ borderColor: COLOR_VALUES.primary[500] }}>
         <CardHeader>
           <CardTitle>Paleta base</CardTitle>
           <CardDescription>
-            Primary, Secondary, Positive y Negative forman la paleta base junto con Neutral.
+            Primary, Positive, Negative y Neutral componen la paleta base adaptable.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -139,22 +206,22 @@ export function ColorSystemPreview({ onClose }: ColorSystemPreviewProps) {
               {
                 name: "Primary",
                 description: "Acciones principales y enlaces",
-                color: "var(--color-primary-500)",
-              },
-              {
-                name: "Secondary",
-                description: "Fondos de soporte y superficies",
-                color: "var(--color-secondary-500)",
-              },
-              {
-                name: "Positive",
-                description: "Feedback positivo y KPIs",
-                color: "var(--color-positive-500)",
+                color: COLOR_VALUES.primary[500],
               },
               {
                 name: "Negative",
                 description: "Alertas y estados críticos",
-                color: "var(--color-negative-500)",
+                color: COLOR_VALUES.negative[500],
+              },
+              {
+                name: "Positive",
+                description: "Feedback positivo y KPIs",
+                color: COLOR_VALUES.positive[500],
+              },
+              {
+                name: "Neutral",
+                description: "Tipografía, bordes y fondos neutrales",
+                color: COLOR_VALUES.neutral[500],
               },
             ].map((item) => (
               <div key={item.name} className="flex items-center gap-3">
@@ -210,7 +277,7 @@ export function ColorSystemPreview({ onClose }: ColorSystemPreviewProps) {
                   Tailwind CSS:
                 </p>
                 <code className="block rounded bg-muted p-2 text-sm">
-                      bg-[var(--color-primary-500)]
+                      bg-primary-600
                 </code>
               </div>
               <div>
@@ -218,7 +285,7 @@ export function ColorSystemPreview({ onClose }: ColorSystemPreviewProps) {
                   Inline styles:
                 </p>
                 <code className="block rounded bg-muted p-2 text-sm">
-                      style=&#123;&#123;color: &quot;var(--color-primary-600)&quot;&#125;&#125;
+                      style=&#123;&#123;color: &quot;oklch(0.42 0.08 45)&quot;&#125;&#125;
                 </code>
               </div>
             </div>
@@ -239,10 +306,10 @@ export function ColorSystemPreview({ onClose }: ColorSystemPreviewProps) {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-3 md:grid-cols-11">
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-11">
                 {scale.shades.map((shade) => {
-                  const token = `var(--color-${scale.prefix}-${shade})`;
-
+                  const colorValue = COLOR_VALUES[scale.semantic][shade];
+                  const token = colorValue;
                   const isCopied = copiedVariable === token;
 
                   return (
@@ -255,7 +322,7 @@ export function ColorSystemPreview({ onClose }: ColorSystemPreviewProps) {
                       <div
                         className="flex h-24 w-full items-end justify-center rounded-md border border-border pb-2 transition group-hover:scale-[1.02]"
                         style={{
-                          backgroundColor: `var(--color-${scale.prefix}-${shade})`,
+                          backgroundColor: colorValue,
                         }}
                       >
                         {isCopied ? (
@@ -264,11 +331,13 @@ export function ColorSystemPreview({ onClose }: ColorSystemPreviewProps) {
                           <Copy className="h-4 w-4 text-white/0 transition group-hover:text-white" />
                         )}
                       </div>
-                      <div className="text-center text-sm">
-                        <p className="font-medium">{shade}</p>
-                        <p className="text-xs text-muted-foreground">
-                          --color-{scale.prefix}-{shade}
+                      <div className="flex w-full flex-col items-center gap-1 text-center text-xs leading-tight">
+                        <p className="text-sm font-semibold text-foreground">
+                          {shade}
                         </p>
+                        <code className="rounded bg-muted px-2 py-1 text-[11px] font-mono text-muted-foreground">
+                          {scale.semantic}.{shade}
+                        </code>
                       </div>
                     </button>
                   );
@@ -280,8 +349,11 @@ export function ColorSystemPreview({ onClose }: ColorSystemPreviewProps) {
                 <div className="flex flex-wrap gap-3">
                   <Button
                     style={{
-                      backgroundColor: `var(--color-${scale.prefix}-600)`,
-                      color: "white",
+                      backgroundColor: COLOR_VALUES[scale.semantic][600],
+                      color:
+                        scale.semantic === "neutral"
+                          ? "var(--foreground)"
+                          : "white",
                     }}
                   >
                     Botón Principal
@@ -289,24 +361,28 @@ export function ColorSystemPreview({ onClose }: ColorSystemPreviewProps) {
                   <Button
                     variant="outline"
                     style={{
-                      borderColor: `var(--color-${scale.prefix}-500)`,
-                      color: `var(--color-${scale.prefix}-700)`,
+                      borderColor: COLOR_VALUES[scale.semantic][500],
+                      color: COLOR_VALUES[scale.semantic][700],
                     }}
                   >
                     Outline
                   </Button>
                   <Badge
+                    variant="secondary"
                     style={{
-                      backgroundColor: `var(--color-${scale.prefix}-100)`,
-                      color: `var(--color-${scale.prefix}-800)`,
+                      backgroundColor: COLOR_VALUES[scale.semantic][100],
+                      color: COLOR_VALUES[scale.semantic][800],
                     }}
                   >
                     Badge claro
                   </Badge>
                   <Badge
                     style={{
-                      backgroundColor: `var(--color-${scale.prefix}-600)`,
-                      color: "white",
+                      backgroundColor: COLOR_VALUES[scale.semantic][600],
+                      color:
+                        scale.semantic === "neutral"
+                          ? "var(--foreground)"
+                          : "white",
                     }}
                   >
                     Badge sólido

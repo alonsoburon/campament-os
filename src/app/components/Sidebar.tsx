@@ -22,7 +22,6 @@ import {
 import { cn } from "./ui/utils";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
-import { Separator } from "./ui/separator";
 
 type ModuleSubItem = {
   id: string;
@@ -33,7 +32,6 @@ type ModuleItem = {
   id: string;
   label: string;
   icon: React.ReactElement;
-  color: string;
   subItems?: ModuleSubItem[];
 };
 
@@ -42,13 +40,11 @@ const MODULES: ModuleItem[] = [
     id: "inicio",
     label: "Inicio",
     icon: <Home className="h-5 w-5" />,
-    color: "text-[var(--color-primary-600)]",
   },
   {
     id: "campamentos",
     label: "Campamentos",
     icon: <Calendar className="h-5 w-5" />,
-    color: "text-[var(--color-primary-600)]",
     subItems: [
       { id: "campamentos-lista", label: "Listado" },
       { id: "campamentos-calendario", label: "Calendario" },
@@ -58,7 +54,6 @@ const MODULES: ModuleItem[] = [
     id: "personas",
     label: "Personas",
     icon: <Users className="h-5 w-5" />,
-    color: "text-[var(--color-secondary-600)]",
     subItems: [
       { id: "personas-scouts", label: "Scouts" },
       { id: "personas-lideres", label: "Líderes" },
@@ -69,7 +64,6 @@ const MODULES: ModuleItem[] = [
     id: "inventario",
     label: "Inventario",
     icon: <Package className="h-5 w-5" />,
-    color: "text-[var(--color-neutral-600)]",
     subItems: [
       { id: "inventario-utensilios", label: "Utensilios" },
       { id: "inventario-equipamiento", label: "Equipamiento" },
@@ -79,7 +73,6 @@ const MODULES: ModuleItem[] = [
     id: "alimentacion",
     label: "Alimentación",
     icon: <Utensils className="h-5 w-5" />,
-    color: "text-[var(--color-primary-700)]",
     subItems: [
       { id: "alimentacion-ingredientes", label: "Ingredientes" },
       { id: "alimentacion-platos", label: "Platos" },
@@ -90,7 +83,6 @@ const MODULES: ModuleItem[] = [
     id: "transporte",
     label: "Transporte",
     icon: <Bus className="h-5 w-5" />,
-    color: "text-[var(--color-secondary-700)]",
     subItems: [
       { id: "transporte-vehiculos", label: "Vehículos" },
       { id: "transporte-asignaciones", label: "Asignaciones" },
@@ -100,7 +92,6 @@ const MODULES: ModuleItem[] = [
     id: "alojamiento",
     label: "Alojamiento",
     icon: <Hotel className="h-5 w-5" />,
-    color: "text-[var(--color-primary-500)]",
     subItems: [
       { id: "alojamiento-tipos", label: "Tipos" },
       { id: "alojamiento-asignaciones", label: "Asignaciones" },
@@ -110,7 +101,6 @@ const MODULES: ModuleItem[] = [
     id: "actividades",
     label: "Actividades",
     icon: <Sparkles className="h-5 w-5" />,
-    color: "text-[var(--color-secondary-500)]",
     subItems: [
       { id: "actividades-catalogo", label: "Catálogo" },
       { id: "actividades-agenda", label: "Agenda" },
@@ -120,7 +110,6 @@ const MODULES: ModuleItem[] = [
     id: "salud",
     label: "Salud",
     icon: <Heart className="h-5 w-5" />,
-    color: "text-[var(--color-negative-600)]",
     subItems: [
       { id: "salud-alergias", label: "Alergias" },
       { id: "salud-info-medica", label: "Info Médica" },
@@ -130,7 +119,6 @@ const MODULES: ModuleItem[] = [
     id: "tareas",
     label: "Tareas",
     icon: <CheckSquare className="h-5 w-5" />,
-    color: "text-[var(--color-neutral-700)]",
     subItems: [
       { id: "tareas-kanban", label: "Tablero Kanban" },
       { id: "tareas-checklist", label: "Checklists" },
@@ -140,7 +128,6 @@ const MODULES: ModuleItem[] = [
     id: "presupuesto",
     label: "Presupuesto",
     icon: <DollarSign className="h-5 w-5" />,
-    color: "text-[var(--color-primary-800)]",
     subItems: [
       { id: "presupuesto-campamentos", label: "Por Campamento" },
       { id: "presupuesto-global", label: "Vista Global" },
@@ -150,13 +137,11 @@ const MODULES: ModuleItem[] = [
     id: "reportes",
     label: "Reportes",
     icon: <BarChart3 className="h-5 w-5" />,
-    color: "text-[var(--color-secondary-800)]",
   },
   {
     id: "configuracion",
     label: "Configuración",
     icon: <Settings className="h-5 w-5" />,
-    color: "text-[var(--color-neutral-500)]",
     subItems: [
       { id: "configuracion-roles", label: "Roles y Permisos" },
       { id: "configuracion-grupos", label: "Grupos y Unidades" },
@@ -178,9 +163,7 @@ export function Sidebar({
   onToggleColorSystem,
   showColorSystem,
 }: SidebarProps) {
-  const [expandedModules, setExpandedModules] = React.useState<string[]>([
-    "campamentos",
-  ]);
+  const [expandedModules, setExpandedModules] = React.useState<string[]>([]);
 
   const handleModuleClick = (module: ModuleItem) => {
     const hasSubItems = Boolean(module.subItems?.length);
@@ -205,46 +188,42 @@ export function Sidebar({
   };
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r border-border bg-card/70 backdrop-blur-sm">
-      <div className="border-b border-border p-6">
-        <h2 className="text-lg font-semibold text-foreground">
-          ERP Campamentos
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Sistema de Gestión Scout
-        </p>
+    <div className="flex h-full flex-col gap-8 px-6 py-8">
+      <div className="space-y-1">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-(--surface-active) font-semibold text-(--text-primary)">
+          C
+        </div>
+        <p className="text-sm font-semibold text-(--text-primary)">CapamentOS</p>
+        <p className="text-xs text-(--text-secondary)">Sistema de Gestión Scout</p>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="space-y-1 p-4">
+      <ScrollArea className="flex-1 pr-2">
+        <div className="space-y-1">
           {MODULES.map((module) => {
             const active = isModuleActive(module);
-            const isExpanded = expandedModules.includes(module.id);
+            const expanded = expandedModules.includes(module.id);
 
             return (
-              <div key={module.id}>
+              <div key={module.id} className="space-y-1">
                 <Button
                   variant="ghost"
                   className={cn(
-                    "h-10 w-full justify-start gap-3",
-                    active && "bg-accent text-accent-foreground",
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--surface-hover) hover:text-(--text-primary)",
+                    active && "bg-(--surface-active) text-(--text-primary) font-semibold",
                   )}
                   onClick={() => handleModuleClick(module)}
                 >
-                  <span className={module.color}>{module.icon}</span>
+                  {module.icon}
                   <span className="flex-1 text-left">{module.label}</span>
-                  {module.subItems && (
+                  {module.subItems ? (
                     <ChevronRight
-                      className={cn(
-                        "h-4 w-4 transition-transform",
-                        isExpanded && "rotate-90",
-                      )}
+                      className={cn("h-4 w-4 transition-transform", expanded && "rotate-90")}
                     />
-                  )}
+                  ) : null}
                 </Button>
 
-                {module.subItems && isExpanded && (
-                  <div className="ml-9 mt-1 space-y-1 border-l border-border/50 pl-4">
+                {module.subItems && expanded ? (
+                  <div className="ml-6 space-y-1">
                     {module.subItems.map((subItem) => {
                       const subActive = currentModule === subItem.id;
 
@@ -253,8 +232,8 @@ export function Sidebar({
                           key={subItem.id}
                           variant="ghost"
                           className={cn(
-                            "h-9 w-full justify-start text-sm",
-                            subActive && "bg-accent text-accent-foreground",
+                            "w-full justify-start rounded-lg px-3 py-2 text-sm text-(--text-secondary) hover:bg-(--surface-hover) hover:text-(--text-primary)",
+                            subActive && "bg-(--surface-active) text-(--text-primary)",
                           )}
                           onClick={() => onModuleChange(subItem.id)}
                         >
@@ -263,26 +242,21 @@ export function Sidebar({
                       );
                     })}
                   </div>
-                )}
+                ) : null}
               </div>
             );
           })}
         </div>
       </ScrollArea>
 
-      <Separator />
-
-      <div className="p-4">
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-3"
-          onClick={onToggleColorSystem}
-        >
-          <Palette className="h-5 w-5" />
-          {showColorSystem ? "Ocultar sistema de colores" : "Sistema de colores"}
-        </Button>
-      </div>
-    </aside>
+      <Button
+        variant="outline"
+        className="flex items-center gap-2 rounded-lg border-transparent bg-transparent text-(--text-secondary) hover:bg-(--surface-hover) hover:text-(--text-primary)"
+        onClick={onToggleColorSystem}
+      >
+        <Palette className="h-5 w-5" />
+        {showColorSystem ? "Ocultar sistema de colores" : "Mostrar sistema de colores"}
+      </Button>
+    </div>
   );
 }
-
