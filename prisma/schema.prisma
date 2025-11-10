@@ -12,10 +12,9 @@ datasource db {
 }
 
 // ============================================================================
-// AUTHENTICATION
+// AUTHENTICATION & USERS
 // ============================================================================
 
-// Necessary for Next auth
 model Account {
   id                       String  @id @default(cuid())
   userId                   String
@@ -44,30 +43,34 @@ model Session {
 }
 
 model User {
-  id                  String            @id @default(cuid())
-  name                String?
-  email               String?           @unique
-  emailVerified       DateTime?
-  image               String?
-  accounts            Account[]
-  sessions            Session[]
-  system_role         SystemRole        @default(LEADER)
-  invitation_status   InvitationStatus?
-  invitation_token    String?           @unique
-  invitation_sent_at  DateTime?
-  pending_group_id    Int?
-  pending_system_role SystemRole?
-  person_id           Int               @unique
-  person              Person            @relation(fields: [person_id], references: [id])
+  id                 String            @id @default(cuid())
+  name               String?
+  email              String?           @unique
+  emailVerified      DateTime?
+  image              String?
+  accounts           Account[]
+  sessions           Session[]
+  invitation_status  InvitationStatus?
+  invitation_token   String?           @unique
+  invitation_sent_at DateTime?
+  pending_group_id   Int?
+  person_id          Int               @unique
+  person             Person            @relation(fields: [person_id], references: [id])
+
+  // --- MODIFIED: SystemRole enum replaced by relation to Role model ---
+  system_role_id         Int
+  system_role            Role  @relation("UserSystemRoles", fields: [system_role_id], references: [id])
+  pending_system_role_id Int?
+  pending_system_role    Role? @relation("UserPendingRoles", fields: [pending_system_role_id], references: [id])
 
   // Audit
   deleted_at DateTime?
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
 
-  // Relations for created/updated records
-  created_scout_groups       ScoutGroup[]       @relation("CreatedScoutGroups")
-  updated_scout_groups       ScoutGroup[]       @relation("UpdatedScoutGroups")
+  // --- MODIFIED: Relations renamed from ScoutGroup to Organization ---
+  created_organizations      Organization[]     @relation("CreatedOrganizations")
+  updated_organizations      Organization[]     @relation("UpdatedOrganizations")
   created_people             Person[]           @relation("CreatedPeople")
   updated_people             Person[]           @relation("UpdatedPeople")
   created_units              Unit[]             @relation("CreatedUnits")
@@ -113,48 +116,8 @@ model VerificationToken {
 }
 
 // ============================================================================
-// ENUMS
+// ENUMS (Remaining enums that are not replaced by models)
 // ============================================================================
-
-enum SystemRole {
-  SUPERADMIN
-  GROUP_ADMIN
-  UNIT_ADMIN
-  LEADER
-  HELPER
-  GUARDIAN
-  MEMBER
-}
-
-enum ScoutBranch {
-  CUBS
-  SWALLOWS
-  MIXED_PACK
-  MIXED_FLOCK
-  SCOUTS
-  GUIDES
-  MIXED_TROOP
-  VENTURERS
-  ROVERS
-  MIXED_VENTURE_UNIT
-  CLAN
-  LEADERSHIP
-  HELPERS
-}
-
-enum GroupRole {
-  MEMBER
-  LEADER
-  GROUP_DIRECTOR
-  HELPER
-  GUARDIAN
-}
-
-enum UnitRole {
-  LEADER
-  ASSISTANT
-  MEMBER
-}
 
 enum AllergySeverity {
   MILD
@@ -207,7 +170,6 @@ enum MealType {
 }
 
 enum UtensilStatus {
-  EXCELLENT
   GOOD
   FAIR
   NEEDS_MAINTENANCE
@@ -241,63 +203,124 @@ enum InvitationStatus {
   REJECTED
 }
 
+enum BudgetItemType {
+  FOOD
+  TRANSPORT
+  ACCOMMODATION
+  OTHER
+}
+
 // ============================================================================
-// MAIN MODELS
+// NEW MODELS: DYNAMIC & GENERALIZED STRUCTURE
 // ============================================================================
 
-model ScoutGroup {
-  id              Int       @id @default(autoincrement())
-  name            String    @unique
+model OrganizationType {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  description   String?
+  organizations Organization[]
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+
+  @@map("organization_types")
+}
+
+enum RoleScope {
+  SYSTEM
+  ORGANIZATION
+  UNIT
+}
+
+model Role {
+  id                   Int                  @id @default(autoincrement())
+  name                 String
+  scope                RoleScope
+  description          String?
+  organization_id      Int?
+  organization         Organization?        @relation(fields: [organization_id], references: [id])
+  user_system_roles    User[]               @relation("UserSystemRoles")
+  user_pending_roles   User[]               @relation("UserPendingRoles")
+  organization_members OrganizationMember[]
+  unit_members         UnitAssistant[]
+  created_at           DateTime             @default(now())
+  updated_at           DateTime             @updatedAt
+
+  @@unique([name, organization_id])
+  @@map("roles")
+}
+
+model Branch {
+  id              Int          @id @default(autoincrement())
+  name            String
+  organization_id Int
+  organization    Organization @relation(fields: [organization_id], references: [id])
+  units           Unit[]
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+
+  @@unique([name, organization_id])
+  @@map("branches")
+}
+
+// ============================================================================
+// MAIN MODELS (MODIFIED)
+// ============================================================================
+
+// --- NEW: Replaces ScoutGroup for a generic structure ---
+model Organization {
+  id              Int                  @id @default(autoincrement())
+  name            String               @unique
+  type_id         Int
+  type            OrganizationType     @relation(fields: [type_id], references: [id])
+  // Optional fields, previously from ScoutGroup
   number          Int?
   district        String?
   zone            String?
   address         String?
   phone           String?
   group_email     String?
-  is_mixed        Boolean   @default(false)
-  foundation_date DateTime? @db.Date
+  is_mixed        Boolean              @default(false)
+  foundation_date DateTime?            @db.Date
   primary_color   Float?
   secondary_color Float?
-
   // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedScoutGroups", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedScoutGroups", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
+  deleted_at      DateTime?
+  created_at      DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
+  creator         User?                @relation("CreatedOrganizations", fields: [creator_id], references: [person_id])
+  creator_id      Int?
+  updater         User?                @relation("UpdatedOrganizations", fields: [updater_id], references: [person_id])
+  updater_id      Int?
   // Relations
-  members     PersonGroup[]
-  camps       Camp[]
-  units       Unit[]
-  utensils    Utensil[]
-  providers   Provider[]
-  ingredients Ingredient[]
-  dishes      Dish[]
+  members         OrganizationMember[]
+  camps           Camp[]
+  units           Unit[]
+  utensils        Utensil[]
+  providers       Provider[]
+  ingredients     Ingredient[]
+  dishes          Dish[]
+  roles           Role[]
+  branches        Branch[]
 
-  @@map("scout_groups")
+  @@map("organizations")
 }
 
 model Person {
-  id                Int       @id @default(autoincrement())
-  full_name         String
-  phone             String?
-  emergency_contact String?
-  birth_date        DateTime? @db.Date
-
+  id                             Int                  @id @default(autoincrement())
+  full_name                      String
+  phone                          String?
+  emergency_contact              String?
+  birth_date                     DateTime?            @db.Date
   // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedPeople", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedPeople", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
+  deleted_at                     DateTime?
+  created_at                     DateTime             @default(now())
+  updated_at                     DateTime             @updatedAt
+  creator                        User?                @relation("CreatedPeople", fields: [creator_id], references: [person_id])
+  creator_id                     Int?
+  updater                        User?                @relation("UpdatedPeople", fields: [updater_id], references: [person_id])
+  updater_id                     Int?
   // Relations
-  groups                         PersonGroup[]
+  organizations                  OrganizationMember[]
   user                           User?
   camp_participations            CampParticipation[]
   allergies                      Allergy[]
@@ -306,55 +329,54 @@ model Person {
   assigned_tasks                 Task[]
   led_activities                 Activity[]
   responsible_for_accommodations Accommodation[]
-  guardians                      PersonGuardian[]    @relation("ChildToGuardian")
-  children                       PersonGuardian[]    @relation("GuardianToChild")
+  guardians                      PersonGuardian[]     @relation("ChildToGuardian")
+  children                       PersonGuardian[]     @relation("GuardianToChild")
 
   @@map("people")
 }
 
 model Unit {
-  id       Int         @id @default(autoincrement())
-  name     String
-  branch   ScoutBranch
-  group_id Int
-
+  id              Int             @id @default(autoincrement())
+  name            String
+  // --- MODIFIED: FK to Organization and Branch instead of ScoutGroup and enum ---
+  organization_id Int
+  organization    Organization    @relation(fields: [organization_id], references: [id])
+  branch_id       Int
+  branch          Branch          @relation(fields: [branch_id], references: [id])
   // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedUnits", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedUnits", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
+  deleted_at      DateTime?
+  created_at      DateTime        @default(now())
+  updated_at      DateTime        @updatedAt
+  creator         User?           @relation("CreatedUnits", fields: [creator_id], references: [person_id])
+  creator_id      Int?
+  updater         User?           @relation("UpdatedUnits", fields: [updater_id], references: [person_id])
+  updater_id      Int?
   // Relations
-  group      ScoutGroup      @relation(fields: [group_id], references: [id])
-  members    UnitAssistant[]
-  activities ActivityUnit[]
+  members         UnitAssistant[]
+  activities      ActivityUnit[]
 
   @@map("units")
 }
 
 model Camp {
-  id         Int      @id @default(autoincrement())
-  name       String
-  location   String
-  start_date DateTime @db.Date
-  end_date   DateTime @db.Date
-  fee_cost   Float    @default(0.0)
-  group_id   Int
-
+  id                  Int                 @id @default(autoincrement())
+  name                String
+  location            String
+  start_date          DateTime            @db.Date
+  end_date            DateTime            @db.Date
+  fee_cost            Float               @default(0.0)
+  // --- MODIFIED: FK to Organization instead of ScoutGroup ---
+  organization_id     Int
+  organization        Organization        @relation(fields: [organization_id], references: [id])
   // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedCamps", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedCamps", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
+  deleted_at          DateTime?
+  created_at          DateTime            @default(now())
+  updated_at          DateTime            @updatedAt
+  creator             User?               @relation("CreatedCamps", fields: [creator_id], references: [person_id])
+  creator_id          Int?
+  updater             User?               @relation("UpdatedCamps", fields: [updater_id], references: [person_id])
+  updater_id          Int?
   // Relations
-  group               ScoutGroup          @relation(fields: [group_id], references: [id])
   camp_participations CampParticipation[]
   menus               CampMenu[]
   transports          Transport[]
@@ -368,25 +390,29 @@ model Camp {
 }
 
 // ============================================================================
-// ASSOCIATION TABLES (Many-to-Many)
+// ASSOCIATION TABLES (MODIFIED)
 // ============================================================================
 
-model PersonGroup {
-  person_id   Int
-  group_id    Int
-  group_role  GroupRole
-  assigned_at DateTime   @default(now())
-  person      Person     @relation(fields: [person_id], references: [id], onDelete: Cascade)
-  group       ScoutGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+// --- MODIFIED: Renamed from PersonGroup, uses Organization and Role models ---
+model OrganizationMember {
+  person_id       Int
+  organization_id Int
+  role_id         Int
+  assigned_at     DateTime     @default(now())
+  person          Person       @relation(fields: [person_id], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  role            Role         @relation(fields: [role_id], references: [id])
 
-  @@id([person_id, group_id])
-  @@map("person_groups")
+  @@id([person_id, organization_id])
+  @@map("organization_members")
 }
 
 model UnitAssistant {
   unit_id      Int
   assistant_id Int
-  role         UnitRole @default(MEMBER)
+  // --- MODIFIED: UnitRole enum replaced by relation to Role model ---
+  role_id      Int
+  role         Role     @relation(fields: [role_id], references: [id])
   assigned_at  DateTime @default(now())
   unit         Unit     @relation(fields: [unit_id], references: [id])
   assistant    Person   @relation(fields: [assistant_id], references: [id])
@@ -437,7 +463,7 @@ model CampParticipation {
 }
 
 // ============================================================================
-// HEALTH PROFILE
+// HEALTH PROFILE (No structural changes needed)
 // ============================================================================
 
 model Allergy {
@@ -447,18 +473,14 @@ model Allergy {
   description  String?
   severity     AllergySeverity?
   observations String?
-
-  // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedAllergies", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedAllergies", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
-  // Relations
-  person Person @relation(fields: [person_id], references: [id])
+  deleted_at   DateTime?
+  created_at   DateTime         @default(now())
+  updated_at   DateTime         @updatedAt
+  creator      User?            @relation("CreatedAllergies", fields: [creator_id], references: [person_id])
+  creator_id   Int?
+  updater      User?            @relation("UpdatedAllergies", fields: [updater_id], references: [person_id])
+  updater_id   Int?
+  person       Person           @relation(fields: [person_id], references: [id])
 
   @@map("allergies")
 }
@@ -471,83 +493,77 @@ model MedicalInfo {
   medications  String?
   restrictions String?
   observations String?
-
-  // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedMedicalInfos", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedMedicalInfos", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
-  // Relations
-  person Person @relation(fields: [person_id], references: [id])
+  deleted_at   DateTime?
+  created_at   DateTime        @default(now())
+  updated_at   DateTime        @updatedAt
+  creator      User?           @relation("CreatedMedicalInfos", fields: [creator_id], references: [person_id])
+  creator_id   Int?
+  updater      User?           @relation("UpdatedMedicalInfos", fields: [updater_id], references: [person_id])
+  updater_id   Int?
+  person       Person          @relation(fields: [person_id], references: [id])
 
   @@map("medical_info")
 }
 
 // ============================================================================
-// FOOD
+// FOOD (MODIFIED)
 // ============================================================================
 
 model Ingredient {
-  id                 Int     @id @default(autoincrement())
+  id                 Int               @id @default(autoincrement())
   name               String
   category           String?
-  unit_of_measure    String  @default("kg")
+  unit_of_measure    String            @default("kg")
   common_allergens   String?
-  is_common_allergen Boolean @default(false)
+  is_common_allergen Boolean           @default(false)
   description        String?
   observations       String?
-  group_id           Int
-
+  // --- MODIFIED: FK to Organization instead of ScoutGroup ---
+  organization_id    Int
+  organization       Organization      @relation(fields: [organization_id], references: [id])
   // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedIngredients", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedIngredients", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
+  deleted_at         DateTime?
+  created_at         DateTime          @default(now())
+  updated_at         DateTime          @updatedAt
+  creator            User?             @relation("CreatedIngredients", fields: [creator_id], references: [person_id])
+  creator_id         Int?
+  updater            User?             @relation("UpdatedIngredients", fields: [updater_id], references: [person_id])
+  updater_id         Int?
   // Relations
-  group            ScoutGroup        @relation(fields: [group_id], references: [id])
-  dish_ingredients DishIngredient[]
-  prices           IngredientPrice[]
+  dish_ingredients   DishIngredient[]
+  prices             IngredientPrice[]
 
-  @@unique([name, group_id])
+  @@unique([name, organization_id])
   @@map("ingredients")
 }
 
 model Dish {
-  id                   Int       @id @default(autoincrement())
+  id                   Int              @id @default(autoincrement())
   name                 String
   description          String?
   meal_type            MealType?
-  base_servings        Int       @default(4)
+  base_servings        Int              @default(4)
   instructions         String?
   preparation_time_min Int?
   difficulty           String?
   present_allergens    String?
-  group_id             Int
-
+  // --- MODIFIED: FK to Organization instead of ScoutGroup ---
+  organization_id      Int
+  organization         Organization     @relation(fields: [organization_id], references: [id])
   // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedDishes", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedDishes", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
+  deleted_at           DateTime?
+  created_at           DateTime         @default(now())
+  updated_at           DateTime         @updatedAt
+  creator              User?            @relation("CreatedDishes", fields: [creator_id], references: [person_id])
+  creator_id           Int?
+  updater              User?            @relation("UpdatedDishes", fields: [updater_id], references: [person_id])
+  updater_id           Int?
   // Relations
-  group       ScoutGroup       @relation(fields: [group_id], references: [id])
-  ingredients DishIngredient[]
-  menu_items  CampMenu[]
-  utensils    DishUtensil[]
+  ingredients          DishIngredient[]
+  menu_items           CampMenu[]
+  utensils             DishUtensil[]
 
-  @@unique([name, group_id])
+  @@unique([name, organization_id])
   @@map("dishes")
 }
 
@@ -565,35 +581,31 @@ model DishIngredient {
 }
 
 model CampMenu {
-  id                 Int      @id @default(autoincrement())
+  id                 Int       @id @default(autoincrement())
   camp_id            Int
   dish_id            Int
-  date               DateTime @db.Date
+  date               DateTime  @db.Date
   meal_type          MealType
   estimated_time     String?
-  number_of_servings Int      @default(1)
+  number_of_servings Int       @default(1)
   observations       String?
   activity_id        Int?
-
-  // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedCampMenus", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedCampMenus", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
-  // Relations
-  camp     Camp      @relation(fields: [camp_id], references: [id])
-  dish     Dish      @relation(fields: [dish_id], references: [id])
-  activity Activity? @relation(fields: [activity_id], references: [id])
+  deleted_at         DateTime?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  creator            User?     @relation("CreatedCampMenus", fields: [creator_id], references: [person_id])
+  creator_id         Int?
+  updater            User?     @relation("UpdatedCampMenus", fields: [updater_id], references: [person_id])
+  updater_id         Int?
+  camp               Camp      @relation(fields: [camp_id], references: [id])
+  dish               Dish      @relation(fields: [dish_id], references: [id])
+  activity           Activity? @relation(fields: [activity_id], references: [id])
 
   @@map("camp_menus")
 }
 
 // ============================================================================
-// UTENSILS
+// UTENSILS (MODIFIED)
 // ============================================================================
 
 model Utensil {
@@ -607,20 +619,19 @@ model Utensil {
   location           String?
   acquisition_date   DateTime?       @db.Date
   observations       String?
-  group_id           Int?
-
+  // --- MODIFIED: FK to Organization instead of ScoutGroup ---
+  organization_id    Int?
+  organization       Organization?   @relation(fields: [organization_id], references: [id])
   // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedUtensils", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedUtensils", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
+  deleted_at         DateTime?
+  created_at         DateTime        @default(now())
+  updated_at         DateTime        @updatedAt
+  creator            User?           @relation("CreatedUtensils", fields: [creator_id], references: [person_id])
+  creator_id         Int?
+  updater            User?           @relation("UpdatedUtensils", fields: [updater_id], references: [person_id])
+  updater_id         Int?
   // Relations
-  group         ScoutGroup?   @relation(fields: [group_id], references: [id])
-  dish_utensils DishUtensil[]
+  dish_utensils      DishUtensil[]
 
   @@map("utensils")
 }
@@ -639,11 +650,11 @@ model DishUtensil {
 }
 
 // ============================================================================
-// TRANSPORT, ACCOMMODATION, ACTIVITIES
+// TRANSPORT, ACCOMMODATION, ACTIVITIES (No structural changes needed)
 // ============================================================================
 
 model Transport {
-  id                 Int         @id @default(autoincrement())
+  id                 Int                   @id @default(autoincrement())
   camp_id            Int
   type               VehicleType
   name               String
@@ -658,19 +669,15 @@ model Transport {
   arrival_location   String?
   observations       String?
   cost               Float?
-
-  // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedTransports", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedTransports", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
-  // Relations
-  camp        Camp                  @relation(fields: [camp_id], references: [id])
-  assignments TransportAssignment[]
+  deleted_at         DateTime?
+  created_at         DateTime              @default(now())
+  updated_at         DateTime              @updatedAt
+  creator            User?                 @relation("CreatedTransports", fields: [creator_id], references: [person_id])
+  creator_id         Int?
+  updater            User?                 @relation("UpdatedTransports", fields: [updater_id], references: [person_id])
+  updater_id         Int?
+  camp               Camp                  @relation(fields: [camp_id], references: [id])
+  assignments        TransportAssignment[]
 
   @@map("transports")
 }
@@ -689,7 +696,7 @@ model TransportAssignment {
 }
 
 model Accommodation {
-  id                    Int               @id @default(autoincrement())
+  id                    Int                       @id @default(autoincrement())
   camp_id               Int
   type                  AccommodationType
   name                  String
@@ -699,47 +706,41 @@ model Accommodation {
   leader_responsible_id Int?
   observations          String?
   cost                  Float?
-
-  // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedAccommodations", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedAccommodations", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
-  // Relations
-  camp               Camp                      @relation(fields: [camp_id], references: [id])
-  assignments        AccommodationAssignment[]
-  leader_responsible Person?                   @relation(fields: [leader_responsible_id], references: [id])
+  deleted_at            DateTime?
+  created_at            DateTime                  @default(now())
+  updated_at            DateTime                  @updatedAt
+  creator               User?                     @relation("CreatedAccommodations", fields: [creator_id], references: [person_id])
+  creator_id            Int?
+  updater               User?                     @relation("UpdatedAccommodations", fields: [updater_id], references: [person_id])
+  updater_id            Int?
+  camp                  Camp                      @relation(fields: [camp_id], references: [id])
+  assignments           AccommodationAssignment[]
+  leader_responsible    Person?                   @relation(fields: [leader_responsible_id], references: [id])
 
   @@map("accommodations")
 }
 
 model AccommodationAssignment {
-  id                      Int       @id @default(autoincrement())
+  id                      Int               @id @default(autoincrement())
   participation_person_id Int
   participation_camp_id   Int
   accommodation_id        Int
-  check_in_date           DateTime? @db.Date
-  check_out_date          DateTime? @db.Date
+  check_in_date           DateTime?         @db.Date
+  check_out_date          DateTime?         @db.Date
   observations            String?
-
-  // Relations
-  accommodation Accommodation     @relation(fields: [accommodation_id], references: [id])
-  participation CampParticipation @relation(fields: [participation_person_id, participation_camp_id], references: [person_id, camp_id])
+  accommodation           Accommodation     @relation(fields: [accommodation_id], references: [id])
+  participation           CampParticipation @relation(fields: [participation_person_id, participation_camp_id], references: [person_id, camp_id])
 
   @@map("accommodation_assignments")
 }
 
 model Activity {
-  id                    Int      @id @default(autoincrement())
+  id                    Int            @id @default(autoincrement())
   camp_id               Int
   name                  String
   description           String?
   type                  String?
-  date                  DateTime @db.Date
+  date                  DateTime       @db.Date
   start_time            String?
   duration_minutes      Int?
   end_time              String?
@@ -749,52 +750,47 @@ model Activity {
   difficulty            String?
   recommended_weather   String?
   observations          String?
-
-  // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedActivities", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedActivities", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
-  // Relations
-  camp               Camp           @relation(fields: [camp_id], references: [id])
-  leader_responsible Person?        @relation(fields: [leader_responsible_id], references: [id])
-  menu_items         CampMenu[]
-  units              ActivityUnit[]
+  deleted_at            DateTime?
+  created_at            DateTime       @default(now())
+  updated_at            DateTime       @updatedAt
+  creator               User?          @relation("CreatedActivities", fields: [creator_id], references: [person_id])
+  creator_id            Int?
+  updater               User?          @relation("UpdatedActivities", fields: [updater_id], references: [person_id])
+  updater_id            Int?
+  camp                  Camp           @relation(fields: [camp_id], references: [id])
+  leader_responsible    Person?        @relation(fields: [leader_responsible_id], references: [id])
+  menu_items            CampMenu[]
+  units                 ActivityUnit[]
 
   @@map("activities")
 }
 
 // ============================================================================
-// COSTS AND BUDGETS
+// COSTS AND BUDGETS (MODIFIED)
 // ============================================================================
 
 model Provider {
-  id             Int     @id @default(autoincrement())
-  name           String
-  type           String?
-  address        String?
-  phone          String?
-  email          String?
-  contact_person String?
-  description    String?
-  observations   String?
-  group_id       Int?
-
+  id                Int               @id @default(autoincrement())
+  name              String
+  type              String?
+  address           String?
+  phone             String?
+  email             String?
+  contact_person    String?
+  description       String?
+  observations      String?
+  // --- MODIFIED: FK to Organization instead of ScoutGroup ---
+  organization_id   Int?
+  organization      Organization?     @relation(fields: [organization_id], references: [id])
   // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedProviders", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedProviders", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
+  deleted_at        DateTime?
+  created_at        DateTime          @default(now())
+  updated_at        DateTime          @updatedAt
+  creator           User?             @relation("CreatedProviders", fields: [creator_id], references: [person_id])
+  creator_id        Int?
+  updater           User?             @relation("UpdatedProviders", fields: [updater_id], references: [person_id])
+  updater_id        Int?
   // Relations
-  group             ScoutGroup?       @relation(fields: [group_id], references: [id])
   ingredient_prices IngredientPrice[]
 
   @@map("providers")
@@ -815,42 +811,31 @@ model IngredientPrice {
 }
 
 model Budget {
-  id                           Int     @id @default(autoincrement())
-  camp_id                      Int     @unique
+  id                           Int          @id @default(autoincrement())
+  camp_id                      Int          @unique
   name                         String?
-  estimated_food_cost          Float   @default(0.0)
-  estimated_transport_cost     Float   @default(0.0)
-  estimated_accommodation_cost Float   @default(0.0)
-  estimated_other_cost         Float   @default(0.0)
-  actual_food_cost             Float   @default(0.0)
-  actual_transport_cost        Float   @default(0.0)
-  actual_accommodation_cost    Float   @default(0.0)
-  actual_other_cost            Float   @default(0.0)
-  estimated_total              Float   @default(0.0)
-  actual_total                 Float   @default(0.0)
+  estimated_food_cost          Float        @default(0.0)
+  estimated_transport_cost     Float        @default(0.0)
+  estimated_accommodation_cost Float        @default(0.0)
+  estimated_other_cost         Float        @default(0.0)
+  actual_food_cost             Float        @default(0.0)
+  actual_transport_cost        Float        @default(0.0)
+  actual_accommodation_cost    Float        @default(0.0)
+  actual_other_cost            Float        @default(0.0)
+  estimated_total              Float        @default(0.0)
+  actual_total                 Float        @default(0.0)
   observations                 String?
-
-  // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedBudgets", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedBudgets", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
-  // Relations
-  camp  Camp         @relation(fields: [camp_id], references: [id])
-  items BudgetItem[]
+  deleted_at                   DateTime?
+  created_at                   DateTime     @default(now())
+  updated_at                   DateTime     @updatedAt
+  creator                      User?        @relation("CreatedBudgets", fields: [creator_id], references: [person_id])
+  creator_id                   Int?
+  updater                      User?        @relation("UpdatedBudgets", fields: [updater_id], references: [person_id])
+  updater_id                   Int?
+  camp                         Camp         @relation(fields: [camp_id], references: [id])
+  items                        BudgetItem[]
 
   @@map("budgets")
-}
-
-enum BudgetItemType {
-  FOOD
-  TRANSPORT
-  ACCOMMODATION
-  OTHER
 }
 
 model BudgetItem {
@@ -872,7 +857,7 @@ model BudgetItem {
 }
 
 // ============================================================================
-// TASKS AND CHECKLIST
+// TASKS AND CHECKLIST (No structural changes needed)
 // ============================================================================
 
 model Task {
@@ -887,25 +872,21 @@ model Task {
   completed_at          DateTime?    @db.Date
   assigned_to_person_id Int?
   notes_on_completion   String?
-
-  // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedTasks", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedTasks", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
-  // Relations
-  camp               Camp    @relation(fields: [camp_id], references: [id])
-  assigned_to_person Person? @relation(fields: [assigned_to_person_id], references: [id])
+  deleted_at            DateTime?
+  created_at            DateTime     @default(now())
+  updated_at            DateTime     @updatedAt
+  creator               User?        @relation("CreatedTasks", fields: [creator_id], references: [person_id])
+  creator_id            Int?
+  updater               User?        @relation("UpdatedTasks", fields: [updater_id], references: [person_id])
+  updater_id            Int?
+  camp                  Camp         @relation(fields: [camp_id], references: [id])
+  assigned_to_person    Person?      @relation(fields: [assigned_to_person_id], references: [id])
 
   @@map("tasks")
 }
 
 model EmergencyContact {
-  id                Int     @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   camp_id           Int
   name              String
   type              String
@@ -918,19 +899,15 @@ model EmergencyContact {
   office_hours      String?
   specialty         String?
   observations      String?
-  is_primary        Boolean @default(false)
-
-  // Audit
-  deleted_at DateTime?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  creator    User?     @relation("CreatedEmergencyContacts", fields: [creator_id], references: [person_id])
-  creator_id Int?
-  updater    User?     @relation("UpdatedEmergencyContacts", fields: [updater_id], references: [person_id])
-  updater_id Int?
-
-  // Relations
-  camp Camp @relation(fields: [camp_id], references: [id])
+  is_primary        Boolean   @default(false)
+  deleted_at        DateTime?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  creator           User?     @relation("CreatedEmergencyContacts", fields: [creator_id], references: [person_id])
+  creator_id        Int?
+  updater           User?     @relation("UpdatedEmergencyContacts", fields: [updater_id], references: [person_id])
+  updater_id        Int?
+  camp              Camp      @relation(fields: [camp_id], references: [id])
 
   @@map("emergency_contacts")
 }

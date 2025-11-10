@@ -25,6 +25,12 @@
 ### Validación final
 1. [ ] Validar modelos con interacciones cruzadas para evitar regresiones (menus vs actividades, transporte vs participaciones, alojamiento vs responsabilidades, etc.).
 
+## Principios de extensibilidad
+
+1. [ ] Definir directrices para modelar dominios usando composición (interfaces, tablas puente y módulos reutilizables) en lugar de herencia rígida.
+2. [ ] Documentar patrones de dependencia entre modelos (`Organization`, `Person`, `Camp`, etc.) para permitir combinaciones flexibles y evolución gradual.
+3. [ ] Crear checklist de evaluación antes de nuevos modelos asegurando compatibilidad con composición, separación de responsabilidades y contratos explícitos.
+
 ## Desarrollo por módulos
 
 ### Línea base
