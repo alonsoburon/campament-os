@@ -53,8 +53,7 @@ export function AppShell({
       <header className="app-shell-topbar">
         <PageHeader
           title={currentTitle}
-          badgeLabel="Versión Alpha"
-          description="CapamentOS prioriza información clara y organizada para que administres tus campamentos sin distracciones."
+          description="CampamentOS prioriza información clara y organizada para que administres tus campamentos sin distracciones."
           session={session}
           signInAction={signInAction}
           signOutAction={signOutAction}
@@ -62,13 +61,15 @@ export function AppShell({
       </header>
 
       {/* Main Content - Floating container with rounded corners */}
-      <main className="app-shell-content">
-        {showColorSystem ? (
-          <ColorSystemPreview onClose={() => setShowColorSystem(false)} />
-        ) : (
-          <Dashboard currentModule={currentModule} />
-        )}
-      </main>
+      <div className="app-shell-content">
+        <main className="app-shell-content-inner">
+          {showColorSystem ? (
+            <ColorSystemPreview onClose={() => setShowColorSystem(false)} />
+          ) : (
+            <Dashboard currentModule={currentModule} />
+          )}
+        </main>
+      </div>
     </div>
   );
 }
