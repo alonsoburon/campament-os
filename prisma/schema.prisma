@@ -58,7 +58,7 @@ model User {
   person             Person            @relation(fields: [person_id], references: [id])
 
   // --- MODIFIED: SystemRole enum replaced by relation to Role model ---
-  system_role_id         Int
+  system_role_id         Int @default(1) // Añadir un valor por defecto para las filas existentes
   system_role            Role  @relation("UserSystemRoles", fields: [system_role_id], references: [id])
   pending_system_role_id Int?
   pending_system_role    Role? @relation("UserPendingRoles", fields: [pending_system_role_id], references: [id])

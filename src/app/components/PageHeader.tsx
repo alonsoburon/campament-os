@@ -1,7 +1,9 @@
 "use client";
 
+import * as React from "react";
 import type { Session } from "next-auth";
-import { User, LogOut, LogIn } from "lucide-react";
+import { LogOut, LogIn, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { ThemeToggle } from "./ThemeToggle";
 import {
@@ -13,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
+import { api } from "~/trpc/react";
 
 type PageHeaderProps = {
   title: string;
@@ -21,6 +24,8 @@ type PageHeaderProps = {
   session: Session | null;
   signInAction: () => Promise<void>;
   signOutAction: () => Promise<void>;
+  organizationName?: string;
+  roleName?: string;
 };
 
 export function PageHeader({
@@ -30,7 +35,96 @@ export function PageHeader({
   session,
   signInAction,
   signOutAction,
+  organizationName,
+  roleName,
 }: PageHeaderProps) {
+  const router = useRouter();
+  const utils = api.useUtils();
+  const [switchingUserId, setSwitchingUserId] = React.useState<string | null>(
+    null,
+  );
+  const [switchError, setSwitchError] = React.useState<string | null>(null);
+  const [isRefreshing, startTransition] = React.useTransition();
+  const devSwitchEnabled = process.env.NODE_ENV !== "production";
+
+  const {
+    data: switchableUsers,
+    isLoading: switchableUsersLoading,
+  } = api.user.listSwitchableUsers.useQuery(undefined, {
+    enabled: devSwitchEnabled,
+    refetchOnWindowFocus: false,
+  });
+
+  const contextLabel = React.useMemo(() => {
+    return [roleName, organizationName].filter(Boolean).join(" • ");
+  }, [organizationName, roleName]);
+
+  const handleSwitchUser = React.useCallback(
+    async (userId: string) => {
+      if (!devSwitchEnabled) return;
+
+      setSwitchError(null);
+      setSwitchingUserId(userId);
+
+      try {
+        const response = await fetch("/api/dev/switch-user", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userId }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          throw new Error(
+            payload?.error ?? "No se pudo cambiar de usuario en este momento.",
+          );
+        }
+
+        await utils.user.listSwitchableUsers.invalidate();
+
+        startTransition(() => {
+          router.refresh();
+        });
+      } catch (error) {
+        console.error("Error al cambiar de usuario:", error);
+        setSwitchError(
+          error instanceof Error
+            ? error.message
+            : "No se pudo cambiar de usuario.",
+        );
+      } finally {
+        setSwitchingUserId(null);
+      }
+    },
+    [devSwitchEnabled, router, startTransition, utils.user.listSwitchableUsers],
+  );
+
+  const renderMembershipSummary = React.useCallback(
+    (memberships: {
+      organizationName: string;
+      roleName: string;
+    }[]) => {
+      if (!memberships || memberships.length === 0) {
+        return "Sin organización asignada";
+      }
+
+      const primary = memberships[0];
+      const additionalCount = memberships.length - 1;
+
+      return [
+        `${primary.roleName} • ${primary.organizationName}`,
+        additionalCount > 0 ? `+${additionalCount} asignaciones` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    },
+    [],
+  );
+
   return (
     <div className="flex w-full items-center justify-between gap-6 px-8">
       {/* Título y descripción */}
@@ -48,6 +142,11 @@ export function PageHeader({
         {description && (
           <p className="text-sm text-muted-foreground max-w-2xl">
             {description}
+          </p>
+        )}
+        {contextLabel && (
+          <p className="text-xs text-muted-foreground/80">
+            {contextLabel}
           </p>
         )}
       </div>
@@ -74,6 +173,74 @@ export function PageHeader({
             align="end"
             className="profile-menu-surface w-64 rounded-xl border border-(--border) bg-(--card) text-(--card-foreground) shadow-s backdrop-blur-sm"
           >
+            {devSwitchEnabled && (
+              <>
+                <DropdownMenuLabel>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Cambio rápido (local)
+                    </p>
+                    <p className="text-[11px] leading-snug text-muted-foreground/80">
+                      Selecciona una persona seed para probar distintos roles.
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+
+                {switchableUsersLoading ? (
+                  <DropdownMenuItem disabled>
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    <span className="text-xs">Cargando usuarios…</span>
+                  </DropdownMenuItem>
+                ) : (switchableUsers?.length ?? 0) > 0 ? (
+                  switchableUsers!.map((user) => (
+                    <DropdownMenuItem
+                      key={user.userId}
+                      disabled={
+                        user.isCurrent ||
+                        (!!switchingUserId && switchingUserId !== user.userId) ||
+                        isRefreshing
+                      }
+                      className="flex flex-col items-start space-y-0.5"
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        void handleSwitchUser(user.userId);
+                      }}
+                    >
+                      <div className="flex w-full items-center justify-between gap-2 text-sm font-medium">
+                        <span>
+                          {user.fullName}
+                          {user.isCurrent ? " (actual)" : ""}
+                        </span>
+                        {(switchingUserId === user.userId || isRefreshing) && (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {renderMembershipSummary(user.memberships)}
+                      </span>
+                      {user.email && (
+                        <span className="text-[10px] text-muted-foreground/70">
+                          {user.email}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <DropdownMenuItem disabled>
+                    No hay usuarios de prueba disponibles.
+                  </DropdownMenuItem>
+                )}
+
+                {switchError && (
+                  <div className="px-3 pb-2 text-xs text-destructive">
+                    {switchError}
+                  </div>
+                )}
+
+                <DropdownMenuSeparator />
+              </>
+            )}
+
             {session ? (
               <>
                 <DropdownMenuLabel>

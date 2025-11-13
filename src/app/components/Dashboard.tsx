@@ -1,14 +1,17 @@
 "use client";
+
+import * as React from "react";
 import {
   AlertCircle,
   AlertTriangle,
   Calendar as CalendarIcon,
   CheckCircle,
-  Clock,
   DollarSign,
   TrendingUp,
   Users as UsersIcon,
 } from "lucide-react";
+
+import { api } from "~/trpc/react";
 
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Badge } from "./ui/badge";
@@ -20,19 +23,94 @@ import {
   CardTitle,
 } from "./ui/card";
 import { Progress } from "./ui/progress";
+import { Skeleton } from "./ui/skeleton";
+
+const numberFormatter = new Intl.NumberFormat("es-ES");
+const currencyFormatter = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+
+const ALERT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  health: AlertTriangle,
+  payments: DollarSign,
+  default: AlertCircle,
+};
+
+const ALERT_STYLE_MAP = {
+  negative: "border-negative-500 bg-negative-50 text-negative-900",
+  warning: "border-secondary-500 bg-secondary-50 text-secondary-900",
+  neutral: "border-border bg-card text-foreground",
+} as const;
+
+const ALERT_ICON_COLOR_MAP = {
+  negative: "text-negative-600",
+  warning: "text-secondary-600",
+  neutral: "text-muted-foreground",
+} as const;
+
+type AlertTone = keyof typeof ALERT_STYLE_MAP;
+
+function isValidAlertTone(tone: string | undefined): tone is AlertTone {
+  return tone !== undefined && tone in ALERT_STYLE_MAP;
+}
+
+const METRIC_CONFIG = {
+  "upcoming-camps": {
+    Icon: CalendarIcon,
+    iconClass: "text-secondary-600",
+    borderClass: "border-secondary-600",
+  },
+  "active-members": {
+    Icon: UsersIcon,
+    iconClass: "text-positive-600",
+    borderClass: "border-positive-600",
+  },
+  "critical-tasks": {
+    Icon: AlertCircle,
+    iconClass: "text-neutral-700",
+    borderClass: "border-neutral-600",
+  },
+  budget: {
+    Icon: TrendingUp,
+    iconClass: "text-secondary-700",
+    borderClass: "border-secondary-700",
+  },
+} as const;
+
+function formatCampDateRange(start: Date, end: Date) {
+  const formatter = new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit",
+    month: "short",
+  });
+
+  return `${formatter.format(start)} – ${formatter.format(end)}`;
+}
+
+function formatMetricValue(id: string, value: number) {
+  if (id === "budget") {
+    return currencyFormatter.format(value);
+  }
+
+  return numberFormatter.format(value);
+}
 
 type DashboardProps = {
   currentModule: string;
 };
 
 export function Dashboard({ currentModule }: DashboardProps) {
+  const { data, isLoading, isError } = api.dashboard.overview.useQuery(undefined, {
+    enabled: currentModule === "inicio",
+    refetchOnWindowFocus: false,
+  });
+
   if (currentModule !== "inicio") {
     return (
       <div className="mx-auto w-full max-w-7xl p-8">
         <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-semibold">
-            {getModuleTitle(currentModule)}
-          </h1>
+          <h1 className="mb-2 text-3xl font-semibold">{getModuleTitle(currentModule)}</h1>
           <p className="text-muted-foreground">
             {getModuleDescription(currentModule)}
           </p>
@@ -47,6 +125,37 @@ export function Dashboard({ currentModule }: DashboardProps) {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-7xl space-y-8 p-8">
+        <Skeleton className="h-6 w-40" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((index) => (
+            <Skeleton key={index} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-56 rounded-2xl" />
+          <Skeleton className="h-56 rounded-2xl" />
+        </div>
+        <Skeleton className="h-64 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="mx-auto w-full max-w-5xl p-8">
+        <Alert>
+          <AlertTitle>No pudimos cargar los datos del tablero</AlertTitle>
+          <AlertDescription>
+            Actualiza la página o vuelve a intentarlo en unos instantes.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 p-8">
       <header className="space-y-2">
@@ -56,75 +165,45 @@ export function Dashboard({ currentModule }: DashboardProps) {
         </p>
       </header>
 
-      <section className="grid gap-4">
-        <Alert className="border-negative-500 bg-negative-50 text-negative-900">
-          <AlertTriangle className="h-4 w-4 text-negative-600" />
-          <AlertTitle>Alertas de salud</AlertTitle>
-          <AlertDescription>
-            3 participantes requieren atención especial para el próximo
-            campamento.
-          </AlertDescription>
-        </Alert>
-        <Alert className="border-secondary-500 bg-secondary-50 text-secondary-900">
-          <DollarSign className="h-4 w-4 text-secondary-600" />
-          <AlertTitle>Pagos pendientes</AlertTitle>
-          <AlertDescription>
-            12 pagos pendientes por un total de $4,850 USD.
-          </AlertDescription>
-        </Alert>
-      </section>
+      {data.alerts.length > 0 && (
+        <section className="grid gap-4">
+          {data.alerts.map((alert) => {
+            const tone: AlertTone = isValidAlertTone(alert.tone) ? alert.tone : "neutral";
+            const Icon = ALERT_ICON_MAP[alert.id] ?? ALERT_ICON_MAP.default;
+            const style = ALERT_STYLE_MAP[tone];
+            const iconColor = ALERT_ICON_COLOR_MAP[tone];
+
+            return (
+              <Alert key={alert.id} className={style}>
+                <Icon className={`h-4 w-4 ${iconColor}`} />
+                <AlertTitle>{alert.title}</AlertTitle>
+                <AlertDescription>{alert.description}</AlertDescription>
+              </Alert>
+            );
+          })}
+        </section>
+      )}
 
       <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {[
-          {
-            title: "Próximos campamentos",
-            value: "3",
-            description: "En los próximos 30 días",
-            Icon: CalendarIcon,
-            iconClass: "text-secondary-600",
-            borderClass: "border-secondary-600",
-          },
-          {
-            title: "Participantes activos",
-            value: "287",
-            description: (
-              <>
-                <span className="text-positive-600">+12%</span> vs mes anterior
-              </>
-            ),
-            Icon: UsersIcon,
-            iconClass: "text-positive-600",
-            borderClass: "border-positive-600",
-          },
-          {
-            title: "Tareas críticas",
-            value: "8",
-            description: "2 vencen en 48 horas",
-            Icon: AlertCircle,
-            iconClass: "text-neutral-700",
-            borderClass: "border-neutral-600",
-          },
-          {
-            title: "Presupuesto actual",
-            value: "$24,500",
-            description: "85% del presupuesto anual",
-            Icon: TrendingUp,
-            iconClass: "text-secondary-700",
-            borderClass: "border-secondary-700",
-          },
-        ].map((metric) => {
-          const Icon = metric.Icon;
+        {data.metrics.map((metric) => {
+          const config = METRIC_CONFIG[metric.id as keyof typeof METRIC_CONFIG];
+          const Icon = config?.Icon ?? CalendarIcon;
+          const borderClass = config?.borderClass ?? "border-border";
+          const iconClass = config?.iconClass ?? "text-muted-foreground";
+
           return (
             <Card
-              key={metric.title}
-              className={`border-l-4 ${metric.borderClass}`}
+              key={metric.id}
+              className={`border-l-4 ${borderClass}`}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-base">{metric.title}</CardTitle>
-                <Icon className={`h-5 w-5 ${metric.iconClass}`} />
+                <Icon className={`h-5 w-5 ${iconClass}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold">{metric.value}</div>
+                <div className="text-2xl font-semibold">
+                  {formatMetricValue(metric.id, metric.value)}
+                </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {metric.description}
                 </p>
@@ -143,58 +222,46 @@ export function Dashboard({ currentModule }: DashboardProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              {
-                name: "Campamento Primavera 2025",
-                date: "15-17 Nov 2025",
-                participants: 45,
-                status: "Confirmado",
-                iconClass: "text-secondary-600",
-              },
-              {
-                name: "Salida de Patrulla",
-                date: "22-24 Nov 2025",
-                participants: 12,
-                status: "Planificación",
-                iconClass: "text-secondary-600",
-              },
-              {
-                name: "Campamento Navideño",
-                date: "20-22 Dic 2025",
-                participants: 67,
-                status: "Confirmado",
-                iconClass: "text-secondary-600",
-              },
-            ].map((camp) => (
-              <div
-                key={camp.name}
-                className="flex items-center justify-between rounded-lg border border-border p-4"
-              >
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <CalendarIcon
-                      className={`h-4 w-4 ${camp.iconClass}`}
-                    />
-                    <span className="font-medium">{camp.name}</span>
+            {data.upcomingCamps.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No hay campamentos programados en los próximos 30 días.
+              </p>
+            ) : (
+              data.upcomingCamps.map((camp) => {
+                const statusVariant = camp.status === "En curso" ? "default" : "secondary";
+
+                return (
+                  <div
+                    key={camp.id}
+                    className="flex items-center justify-between rounded-lg border border-border p-4"
+                  >
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-secondary-600" />
+                        <span className="font-medium">{camp.name}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <CalendarIcon className="h-3 w-3" />
+                          {formatCampDateRange(new Date(camp.startDate), new Date(camp.endDate))}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <UsersIcon className="h-3 w-3" />
+                          {camp.participants} participante{camp.participants === 1 ? "" : "s"}
+                        </span>
+                        {camp.pendingPayments > 0 && (
+                          <span className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            {camp.pendingPayments} pago{camp.pendingPayments === 1 ? "" : "s"} pendiente{camp.pendingPayments === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Badge variant={statusVariant}>{camp.status}</Badge>
                   </div>
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {camp.date}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <UsersIcon className="h-3 w-3" />
-                      {camp.participants} participantes
-                    </span>
-                  </div>
-                </div>
-                <Badge
-                  variant={camp.status === "Confirmado" ? "default" : "secondary"}
-                >
-                  {camp.status}
-                </Badge>
-              </div>
-            ))}
+                );
+              })
+            )}
           </CardContent>
         </Card>
 
@@ -206,66 +273,39 @@ export function Dashboard({ currentModule }: DashboardProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[
-              {
-                title: "Confirmar transporte",
-                module: "Transporte",
-                priority: "Alta",
-                dueDate: "En 2 días",
-            iconClass: "text-secondary-600",
-            badgeClass: "border-secondary-600 text-secondary-600",
-              },
-              {
-                title: "Revisar alergias participantes",
-                module: "Salud",
-                priority: "Alta",
-                dueDate: "En 3 días",
-            iconClass: "text-negative-600",
-            badgeClass: "border-negative-600 text-negative-600",
-              },
-              {
-                title: "Planificar menús campamento",
-                module: "Alimentación",
-                priority: "Media",
-                dueDate: "En 5 días",
-            iconClass: "text-secondary-700",
-            badgeClass: "border-secondary-700 text-secondary-700",
-              },
-              {
-                title: "Verificar equipamiento",
-                module: "Inventario",
-                priority: "Media",
-                dueDate: "En 1 semana",
-            iconClass: "text-neutral-600",
-            badgeClass: "border-neutral-600 text-neutral-600",
-              },
-            ].map((task) => (
-              <div
-                key={task.title}
-                className="flex items-center justify-between rounded-lg border border-border p-4"
-              >
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                <CheckCircle className={`h-4 w-4 ${task.iconClass}`} />
-                    <span className="font-medium">{task.title}</span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                    <Badge
-                      variant="outline"
-                  className={task.badgeClass}
-                    >
-                      {task.module}
+            {data.tasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No hay tareas críticas en este momento.
+              </p>
+            ) : (
+              data.tasks.map((task) => {
+                const isHighPriority = task.priority === "Urgente" || task.priority === "Alta";
+                return (
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between rounded-lg border border-border p-4"
+                  >
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle
+                          className={`h-4 w-4 ${isHighPriority ? "text-negative-600" : "text-secondary-600"}`}
+                        />
+                        <span className="font-medium">{task.title}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                        <Badge variant="outline" className="border-border text-muted-foreground">
+                          {task.module}
+                        </Badge>
+                        <span>{task.dueInLabel}</span>
+                      </div>
+                    </div>
+                    <Badge variant={isHighPriority ? "destructive" : "secondary"}>
+                      {task.priority}
                     </Badge>
-                    <span>{task.dueDate}</span>
                   </div>
-                </div>
-                <Badge
-                  variant={task.priority === "Alta" ? "destructive" : "secondary"}
-                >
-                  {task.priority}
-                </Badge>
-              </div>
-            ))}
+                );
+              })
+            )}
           </CardContent>
         </Card>
       </section>
@@ -279,24 +319,15 @@ export function Dashboard({ currentModule }: DashboardProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            {[
-          { name: "Campamentos", progress: 85 },
-          { name: "Personas", progress: 92 },
-          { name: "Inventario", progress: 65 },
-          { name: "Alimentación", progress: 78 },
-          { name: "Transporte", progress: 70 },
-          { name: "Alojamiento", progress: 73 },
-          { name: "Salud", progress: 88 },
-          { name: "Tareas", progress: 60 },
-        ].map((module) => (
-          <div key={module.name}>
-            <div className="mb-2 flex items-center justify-between text-sm font-medium">
-              <span>{module.name}</span>
-              <span className="text-muted-foreground">{module.progress}%</span>
-            </div>
-            <Progress value={module.progress} className="h-2" />
-          </div>
-        ))}
+            {data.modulesProgress.map((module) => (
+              <div key={module.id}>
+                <div className="mb-2 flex items-center justify-between text-sm font-medium">
+                  <span>{module.name}</span>
+                  <span className="text-muted-foreground">{module.progress}%</span>
+                </div>
+                <Progress value={module.progress} className="h-2" />
+              </div>
+            ))}
           </CardContent>
         </Card>
       </section>

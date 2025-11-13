@@ -14,16 +14,21 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-(--primary) text-(--primary-foreground) hover:bg-(--primary)/90",
+          "bg-[color:var(--primary)] text-[color:var(--primary-foreground)] hover:bg-[color:var(--primary)] hover:brightness-110",
+        positive:
+          "bg-[color:var(--positive)] text-[color:var(--positive-foreground)] hover:bg-[color:var(--positive)] hover:brightness-110",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "bg-[color:var(--destructive)] text-[color:var(--destructive-foreground)] hover:bg-[color:var(--destructive)] hover:brightness-110",
         outline:
-          "bg-transparent text-(--text-secondary) hover:bg-(--surface-hover) hover:text-(--text-primary)",
+          "bg-transparent text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)] border border-[color:var(--border)]",
         secondary:
-          "bg-(--surface-active) text-(--text-primary) hover:bg-(--surface-hover)",
+          "bg-[color:var(--secondary)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-hover)]",
+        muted:
+          "bg-[color:var(--muted)] text-[color:var(--text-secondary)] border border-[color:var(--border)]",
         ghost:
-          "bg-transparent text-(--text-secondary) hover:bg-(--surface-hover) hover:text-(--text-primary)",
-        link: "text-(--primary) underline underline-offset-4 hover:text-(--text-primary)",
+          "bg-transparent text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--text-primary)]",
+        link:
+          "text-[color:var(--primary)] underline underline-offset-4 hover:text-[color:var(--text-primary)]",
       },
       size: {
         default: "h-10 px-4",

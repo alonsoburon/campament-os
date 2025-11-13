@@ -12,7 +12,7 @@ export function ThemeToggle() {
   const [optimisticTheme, setOptimisticTheme] = React.useState<string | null>(
     null,
   );
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  const buttonRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     setMounted(true);
@@ -92,15 +92,23 @@ export function ThemeToggle() {
   }
 
   return (
-    <button
+    <div
       ref={buttonRef}
-      type="button"
+      role="button"
+      tabIndex={0}
       aria-label="Cambiar tema"
       onClick={toggleTheme}
-      className="theme-toggle-button group relative flex h-10 w-10 items-center justify-center rounded-full border border-(--border) bg-(--card) text-(--text-primary) shadow-s transition-all duration-300 hover:-translate-y-0.5 hover:shadow-m focus:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 focus-visible:ring-offset-2 focus-visible:ring-offset-(--card)"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggleTheme();
+        }
+      }}
+      className="theme-toggle-button group relative flex h-10 w-10 items-center justify-center rounded-full border border-(--border) bg-(--card) text-(--text-primary) shadow-s transition-all duration-300 hover:-translate-y-0.5 hover:shadow-m focus:outline-none focus-visible:ring-2 focus-visible:ring-(--ring)/40 focus-visible:ring-offset-2 focus-visible:ring-offset-(--card) cursor-pointer"
     >
+      {/* @ts-expect-error - Within tiene tipos incorrectos que requieren props innecesarias */}
       <Within duration={750} toggled={isDark} />
-    </button>
+    </div>
   );
 }
 

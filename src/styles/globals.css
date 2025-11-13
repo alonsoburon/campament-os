@@ -157,14 +157,14 @@
 
   .dark {
     /* Variables neutrales para el tema oscuro */
-    --background: oklch(0.125 0 0);
+    --background: oklch(0.1 0 0); /* Hacer el fondo un poco más oscuro */
     --background-primary: var(--sidebar);
     --foreground: oklch(0.985 0 0);
     --text-primary: var(--foreground);
     --text-secondary: var(--muted-foreground);
     --surface-hover: var(--muted);
     --surface-active: var(--accent);
-    --card: oklch(0.175 0 0);
+    --card: oklch(0.2 0 0); /* Hacer la tarjeta más clara que el fondo */
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.175 0 0);
     --popover-foreground: oklch(0.985 0 0);
@@ -195,7 +195,7 @@
     --sidebar-ring: oklch(0.5 0 0);
     --sidebar-indicator: #ffffff;
     --logo-monochrome: oklch(0.96 0 0);
-    --logo-monochrome-inverted: oklch(0.175 0 0);
+    --logo-monochrome-inverted: oklch(0.985 0 0);
     --shadow-s: inset 0 1px 2px #00000030, 0 1px 2px #ffffff10, 0 2px 4px #00000015;
     --shadow-m: inset 0 1px 2px #00000050, 0 2px 4px #ffffff10, 0 4px 8px #00000015;
     --shadow-l: inset 0 1px 2px #00000070, 0 4px 6px #ffffff10, 0 6px 10px #00000015;

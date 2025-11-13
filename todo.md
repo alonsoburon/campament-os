@@ -6,29 +6,30 @@ Este documento traza el camino para transformar el prototipo de CampamentOS en u
 
 _Objetivo: Eliminar los cuellos de botella del prototipo, establecer la arquitectura de la API y asegurar la multi-tenencia desde el núcleo._
 
--   **[ ] 1. API tRPC - Módulos Base:**
-    -   [ ] Crear el router `organizationRouter.ts` con procedimientos para `create`, `getById`, `update`.
-    -   [ ] Crear el router `personRouter.ts` para CRUD de personas dentro de una organización.
-    -   [ ] Crear el router `userRouter.ts` para gestionar invitaciones y roles.
-    -   [ ] Registrar los nuevos routers en `src/server/api/root.ts`.
+-   **[x] 1. API tRPC - Módulos Base:**
+    -   [x] Crear el router `organizationRouter.ts` con procedimientos para `create`, `getById`, `update`.
+    -   [x] Crear el router `personRouter.ts` para CRUD de personas dentro de una organización.
+    -   [x] Crear el router `userRouter.ts` para gestionar invitaciones y roles.
+    -   [x] Registrar los nuevos routers en `src/server/api/root.ts`.
 
 -   **[ ] 2. Autenticación y Autorización Multi-Tenant:**
-    -   [ ] **Eliminar el cuello de botella de `AUTHORIZED_EMAIL`**: Modificar `src/server/auth/config.ts` para permitir el registro de nuevos usuarios.
-    -   [ ] **Implementar Flujo de Invitaciones**:
-        -   Crear un procedimiento en `userRouter` para que un admin de organización pueda generar un `invitation_token`.
-        -   Crear una página de registro donde los usuarios puedan usar su token para unirse a una organización específica.
-        -   Al aceptar, asignar `person_id` y el rol correspondiente al `User`.
-    -   [ ] **Crear Procedimiento Protegido por Organización**: Extender el `protectedProcedure` de tRPC para crear un `organizationProcedure` que valide que el usuario que hace la llamada pertenece a la organización que intenta modificar (`ctx.session.user.organizationId === input.organizationId`).
+    -   [x] **Eliminar el cuello de botella de `AUTHORIZED_EMAIL`** (Diferido por solicitud del usuario): Modificar `src/server/auth/config.ts` para permitir el registro de nuevos usuarios.
+    -   [x] **Implementar Flujo de Invitaciones**:
+        -   [x] Crear un procedimiento en `userRouter` para que un admin de organización pueda generar un `invitation_token`.
+        -   [x] Crear una página de registro donde los usuarios puedan usar su token para unirse a una organización específica.
+        -   [x] Al aceptar, asignar `person_id` y el rol correspondiente al `User`.
+    -   [x] **Crear Procedimiento Protegido por Organización**: Extender el `protectedProcedure` de tRPC para crear un `organizationProcedure` que valide que el usuario que hace la llamada pertenece a la organización que intenta modificar (`ctx.session.user.organizationId === input.organizationId`).
+    -   [ ] Habilitar en entorno local el cambio rápido entre usuarios/personas para probar roles distintos.
 
--   **[ ] 3. Flujo de Onboarding Inicial:**
-    -   [ ] Crear una página "Crear mi Organización" para el primer usuario que se registra.
-    -   [ ] Implementar el `create` en `organizationRouter` para que al crear una `Organization`, también se cree el `OrganizationMember` que vincula al creador como administrador.
-    -   [ ] Al crear una organización, generar los `Roles` y `Branches` por defecto para esa organización.
+-   **[x] 3. Flujo de Onboarding Inicial:**
+    -   [x] Crear una página "Crear mi Organización" para el primer usuario que se registra.
+    -   [x] Implementar el `create` en `organizationRouter` para que al crear una `Organization`, también se cree el `OrganizationMember` que vincula al creador como administrador.
+    -   [x] Al crear una organización, generar los `Roles` y `Branches` por defecto para esa organización.
 
--   **[ ] 4. Dinamizar la Interfaz de Usuario:**
-    -   [ ] Conectar el `Sidebar` para que los módulos se muestren según los permisos del rol del usuario.
-    -   [ ] Conectar el `PageHeader` para mostrar correctamente la información del usuario logueado desde la sesión.
-    -   [ ] Reemplazar los datos estáticos del `Dashboard` con llamadas a la API de tRPC (ej. `campRouter.getUpcoming`, `taskRouter.getCritical`).
+-   **[x] 4. Dinamizar la Interfaz de Usuario:**
+    -   [x] Conectar el `Sidebar` para que los módulos se muestren según los permisos del rol del usuario.
+    -   [x] Conectar el `PageHeader` para mostrar correctamente la información del usuario logueado desde la sesión.
+    -   [x] Reemplazar los datos estáticos del `Dashboard` con llamadas a la API de tRPC (ej. `campRouter.getUpcoming`, `taskRouter.getCritical`).
 
 ## Fase 1: Implementación del MVP - Módulos Centrales 🏕️
 
@@ -71,7 +72,7 @@ _Objetivo: Construir la funcionalidad principal de gestión de campamentos, aseg
 
 _Objetivo: Añadir profundidad al producto, mejorar flujos y ofrecer más valor a los usuarios avanzados._
 
--   **[ ] Módulo de Presupuesto:**
+-   **[ ] Módulo de Presupuesto:**mpecemos
     -   [ ] UI para crear un `Budget` para un `Camp`.
     -   [ ] Formularios para añadir `BudgetItem` y vincularlos a `Ingredient`, `Transport`, etc.
     -   [ ] Vista que compare costos estimados vs. reales.

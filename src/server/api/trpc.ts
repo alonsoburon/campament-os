@@ -131,3 +131,48 @@ export const protectedProcedure = t.procedure
       },
     });
   });
+
+/**
+ * Protected (authenticated and organization-scoped) procedure
+ *
+ * If you want a query or mutation to ONLY be accessible to logged in users
+ * who belong to a specific organization, use this. It verifies the session is valid,
+ * guarantees `ctx.session.user` is not null, and validates `organizationId` from the input.
+ */
+export const organizationProcedure = protectedProcedure.use(
+  t.middleware(async ({ ctx, next, input }) => {
+    if (!ctx.session) { // Comprobación explícita para asegurar que ctx.session no es nulo
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Sesión no encontrada o inválida.",
+      });
+    }
+
+    if (!ctx.session.user.organization_id) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "El usuario no está asociado a ninguna organización.",
+      });
+    }
+
+    // Asumimos que el input del procedimiento tendrá una propiedad 'organizationId'
+    // o que el procedimiento se encargará de obtenerlo de alguna otra forma.
+    // Para simplificar, validamos directamente si el input tiene organizationId
+    // y si coincide con el del usuario en sesión.
+    const inputOrganizationId = (input as { organizationId?: number })?.organizationId;
+
+    if (inputOrganizationId && inputOrganizationId !== ctx.session.user.organization_id) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Acceso denegado: el usuario no pertenece a la organización especificada.",
+      });
+    }
+
+    return next({
+      ctx: {
+        // Infers the organization_id as non-nullable for procedures using this
+        organizationId: ctx.session.user.organization_id,
+      },
+    });
+  }),
+);
