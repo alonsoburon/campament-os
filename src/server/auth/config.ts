@@ -5,6 +5,7 @@ import {
 } from "next-auth/adapters";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
 
 import { db } from "~/server/db";
 
@@ -18,8 +19,10 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      person_id: number; // Añadir person_id
-      organization_id?: number; // Añadir organization_id opcional
+      person_id: number;
+      organization_id?: number;
+      organization_name?: string;
+      role_name?: string;
       // ...other properties
       // role: UserRole;
     } & DefaultSession["user"];
@@ -109,16 +112,59 @@ const adapter: Adapter = {
   },
 };
 
+// Configurar los proveedores de autenticación
+const authProviders: NextAuthConfig["providers"] = [
+  GoogleProvider({
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  }),
+];
+
+// En desarrollo, añadir el proveedor de personificación
+if (process.env.NODE_ENV === "development") {
+  authProviders.push(
+    CredentialsProvider({
+      id: "impersonate",
+      name: "Impersonate",
+      credentials: {
+        userId: { label: "User ID", type: "text" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.userId || typeof credentials.userId !== "string") {
+          return null;
+        }
+
+        // Buscar el usuario en la base de datos por su ID
+        const user = await db.user.findUnique({
+          where: { id: credentials.userId },
+        });
+
+        // Si el usuario existe, NextAuth creará la sesión automáticamente
+        if (user) {
+          return user as AdapterUser;
+        }
+
+        return null;
+      },
+    }),
+  );
+}
+
 export const authConfig = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET
-    })
-  ],
+  providers: authProviders,
   adapter,
+  session: {
+    // Database sessions - control total y revocación inmediata
+    strategy: "database",
+    maxAge: 30 * 24 * 60 * 60, // 30 días
+  },
   callbacks: {
     async signIn({ account, profile }: SignInCallbackParams) {
+      // Permitir autenticación del proveedor de personificación en desarrollo
+      if (account?.provider === "impersonate" && process.env.NODE_ENV === "development") {
+        return true;
+      }
+
       if (account?.provider !== "google") {
         return false;
       }
@@ -165,27 +211,43 @@ export const authConfig = {
       return true;
     },
     session: async ({ session, user }) => {
+      // OPTIMIZACIÓN: Una sola query con todos los datos necesarios
+      // En lugar de múltiples queries pequeñas, hacemos una grande y eficiente
       const dbUser = await db.user.findUnique({
         where: { id: user.id },
         select: {
           person_id: true,
-          person: { // Acceder a la relación Person del usuario
+          person: {
             select: {
-              organizations: { // Acceder a las organizaciones a través de Person
-                select: { organization_id: true },
-                take: 1,
+              organizations: {
+                select: { 
+                  organization_id: true,
+                  organization: {
+                    select: { name: true }
+                  },
+                  role: {
+                    select: { name: true }
+                  }
+                },
+                take: 1, // Solo la primera organización
+                orderBy: { assigned_at: 'asc' }
               },
             },
           },
         },
       });
+      
+      const primaryOrg = dbUser?.person?.organizations[0];
+      
       return {
         ...session,
         user: {
           ...session.user,
           id: user.id,
-          person_id: dbUser?.person_id, // Añadir person_id a la sesión
-          organization_id: dbUser?.person?.organizations[0]?.organization_id, // Acceder al organization_id correctamente
+          person_id: dbUser?.person_id,
+          organization_id: primaryOrg?.organization_id,
+          organization_name: primaryOrg?.organization.name,
+          role_name: primaryOrg?.role.name,
         },
       };
     },

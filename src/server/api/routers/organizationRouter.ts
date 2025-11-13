@@ -256,6 +256,8 @@ export const organizationRouter = createTRPCRouter({
   getCurrentContext: protectedProcedure.query(async ({ ctx }) => {
     const personId = ctx.session.user.person_id;
     const organizationId = ctx.session.user.organization_id;
+    const organizationName = ctx.session.user.organization_name;
+    const roleName = ctx.session.user.role_name;
 
     if (!personId) {
       throw new TRPCError({
@@ -272,6 +274,26 @@ export const organizationRouter = createTRPCRouter({
       };
     }
 
+    // OPTIMIZACIÓN: Si la sesión ya tiene toda la info, NO hacer query a la BD
+    if (organizationName && roleName) {
+      const roleNameNormalized = normalizeRoleName(roleName);
+      const allowedModules =
+        ROLE_MODULES[roleNameNormalized] ?? (["inicio"] as (typeof ALL_MODULES)[number][]);
+
+      return {
+        organization: {
+          id: organizationId,
+          name: organizationName,
+        },
+        role: {
+          id: 0, // No tenemos el role_id en la sesión, pero no es crítico
+          name: roleName,
+        },
+        allowedModules,
+      };
+    }
+
+    // Fallback: Si no está en la sesión, hacer la query (solo en casos raros)
     const membership = await ctx.db.organizationMember.findUnique({
       where: {
         person_id_organization_id: {

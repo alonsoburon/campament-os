@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import type { Session } from "next-auth";
+import { signIn } from "next-auth/react";
 import { LogOut, LogIn, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -67,25 +68,18 @@ export function PageHeader({
       setSwitchingUserId(userId);
 
       try {
-        const response = await fetch("/api/dev/switch-user", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ userId }),
+        // Usar signIn con el proveedor de personificación
+        const result = await signIn("impersonate", {
+          redirect: false, // Evitar recarga completa de la página
+          userId: userId,
         });
 
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as
-            | { error?: string }
-            | null;
-          throw new Error(
-            payload?.error ?? "No se pudo cambiar de usuario en este momento.",
-          );
+        if (result?.error) {
+          throw new Error("El cambio de sesión falló. Revisa la consola.");
         }
 
-        await utils.user.listSwitchableUsers.invalidate();
-
+        // Invalidar toda la caché de tRPC y refrescar la página
+        await utils.invalidate();
         startTransition(() => {
           router.refresh();
         });
@@ -100,7 +94,7 @@ export function PageHeader({
         setSwitchingUserId(null);
       }
     },
-    [devSwitchEnabled, router, startTransition, utils.user.listSwitchableUsers],
+    [devSwitchEnabled, router, startTransition, utils],
   );
 
   const renderMembershipSummary = React.useCallback(
@@ -113,6 +107,10 @@ export function PageHeader({
       }
 
       const primary = memberships[0];
+      if (!primary) {
+        return "Sin organización asignada";
+      }
+
       const additionalCount = memberships.length - 1;
 
       return [
@@ -164,7 +162,7 @@ export function PageHeader({
               size="icon"
               className="h-9 w-9 rounded-full hover:bg-accent"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-neutral-900 to-neutral-700 text-xs font-semibold text-white dark:from-neutral-100 dark:to-neutral-300 dark:text-neutral-900">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br from-neutral-900 to-neutral-700 text-xs font-semibold text-white dark:from-neutral-100 dark:to-neutral-300 dark:text-neutral-900">
                 {session?.user?.name?.[0]?.toUpperCase() ?? "U"}
               </div>
             </Button>
