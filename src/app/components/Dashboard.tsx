@@ -9,6 +9,11 @@ import {
   DollarSign,
   TrendingUp,
   Users as UsersIcon,
+  CreditCard,
+  CheckSquare,
+  MapPin,
+  Clock,
+  UserCircle,
 } from "lucide-react";
 
 import { api } from "~/trpc/react";
@@ -24,12 +29,13 @@ import {
 } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { Skeleton } from "./ui/skeleton";
+import Link from "next/link"; // Importar Link
+import { ColorSystemPreview } from "./ColorSystemPreview"; // Importar ColorSystemPreview
 
 const numberFormatter = new Intl.NumberFormat("es-ES");
 const currencyFormatter = new Intl.NumberFormat("es-ES", {
   style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
+  currency: "EUR",
 });
 
 const ALERT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -96,238 +102,172 @@ function formatMetricValue(id: string, value: number) {
   return numberFormatter.format(value);
 }
 
-type DashboardProps = {
+interface DashboardProps {
   currentModule: string;
-};
+}
 
 export function Dashboard({ currentModule }: DashboardProps) {
-  const { data, isLoading, isError } = api.dashboard.overview.useQuery(undefined, {
-    enabled: currentModule === "inicio",
-    refetchOnWindowFocus: false,
+  const {
+    data: data,
+    isLoading,
+    isError,
+  } = api.dashboard.getSummary.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000, // Cachea el dashboard por 5 minutos
   });
 
-  if (currentModule !== "inicio") {
-    return (
-      <div className="mx-auto w-full max-w-7xl p-8">
-        <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-semibold">{getModuleTitle(currentModule)}</h1>
-          <p className="text-muted-foreground">
-            {getModuleDescription(currentModule)}
-          </p>
-        </div>
-
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Contenido del módulo en desarrollo.
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   if (isLoading) {
-    return (
-      <div className="mx-auto w-full max-w-7xl space-y-8 p-8">
-        <Skeleton className="h-6 w-40" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((index) => (
-            <Skeleton key={index} className="h-24 rounded-xl" />
-          ))}
-        </div>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Skeleton className="h-56 rounded-2xl" />
-          <Skeleton className="h-56 rounded-2xl" />
-        </div>
-        <Skeleton className="h-64 rounded-2xl" />
-      </div>
-    );
+    return <div className="grid gap-4 p-4 md:p-6 lg:p-8"><Skeleton className="h-40 w-full" /></div>; // Un skeleton simple mientras carga
   }
 
   if (isError || !data) {
-    return (
-      <div className="mx-auto w-full max-w-5xl p-8">
-        <Alert>
-          <AlertTitle>No pudimos cargar los datos del tablero</AlertTitle>
-          <AlertDescription>
-            Actualiza la página o vuelve a intentarlo en unos instantes.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
+    return <div className="p-4 text-destructive">Error al cargar el dashboard.</div>;
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8 p-8">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold">Panel General</h1>
+    <div className="grid gap-4 p-4 md:p-6 lg:p-8">
+      <header className="mb-6 space-y-2">
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard General</h1>
         <p className="text-muted-foreground">
-          Vista general del sistema con métricas clave y alertas.
+          Resumen de todos los campamentos y actividades de tu organización.
         </p>
       </header>
+
+      <ColorSystemPreview onClose={() => {}} /> {/* Renderizar ColorSystemPreview directamente */}
 
       {data.alerts.length > 0 && (
         <section className="grid gap-4">
           {data.alerts.map((alert) => {
-            const tone: AlertTone = isValidAlertTone(alert.tone) ? alert.tone : "neutral";
-            const Icon = ALERT_ICON_MAP[alert.id] ?? ALERT_ICON_MAP.default;
-            const style = ALERT_STYLE_MAP[tone];
-            const iconColor = ALERT_ICON_COLOR_MAP[tone];
-
-            return (
-              <Alert key={alert.id} className={style}>
-                <Icon className={`h-4 w-4 ${iconColor}`} />
-                <AlertTitle>{alert.title}</AlertTitle>
-                <AlertDescription>{alert.description}</AlertDescription>
-              </Alert>
-            );
+            switch (alert.type) {
+              case "payments_pending":
+                return (
+                  <Card key={alert.id} className="border-orange-500 bg-orange-50/20">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-orange-700">
+                        <CreditCard className="h-5 w-5" />
+                        Pagos Pendientes
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-orange-600">
+                      Tienes {alert.count} participantes con pagos pendientes por un total de{' '}
+                      {currencyFormatter.format(alert.totalAmount)}. Es hora de recordarles!
+                    </CardContent>
+                  </Card>
+                );
+              case "tasks_due_soon":
+                return (
+                  <Card key={alert.id} className="border-yellow-500 bg-yellow-50/20">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-yellow-700">
+                        <CheckSquare className="h-5 w-5" />
+                        Tareas Próximas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-yellow-600">
+                      Hay {alert.count} tareas que vencerán en los próximos 7 días.
+                      ¡Asegúrate de que todo esté en orden!
+                    </CardContent>
+                  </Card>
+                );
+              default:
+                return null;
+            }
           })}
         </section>
       )}
 
-      <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {data.metrics.map((metric) => {
-          const config = METRIC_CONFIG[metric.id as keyof typeof METRIC_CONFIG];
-          const Icon = config?.Icon ?? CalendarIcon;
-          const borderClass = config?.borderClass ?? "border-border";
-          const iconClass = config?.iconClass ?? "text-muted-foreground";
-
-          return (
-            <Card
-              key={metric.id}
-              className={`border-l-4 ${borderClass}`}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base">{metric.title}</CardTitle>
-                <Icon className={`h-5 w-5 ${iconClass}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-semibold">
-                  {formatMetricValue(metric.id, metric.value)}
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {metric.description}
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-2">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Próximos campamentos</CardTitle>
-            <CardDescription>
-              Campamentos programados en las próximas semanas.
-            </CardDescription>
+            <CardTitle>Campamentos Recientes</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {data.upcomingCamps.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No hay campamentos programados en los próximos 30 días.
-              </p>
-            ) : (
-              data.upcomingCamps.map((camp) => {
-                const statusVariant = camp.status === "En curso" ? "default" : "secondary";
-
-                return (
-                  <div
-                    key={camp.id}
-                    className="flex items-center justify-between rounded-lg border border-border p-4"
-                  >
+          <CardContent>
+            <ul className="space-y-4">
+              {data.recentCamps.length > 0 ? (
+                data.recentCamps.map((camp) => (
+                  <li key={camp.id} className="flex items-center gap-4">
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2">
                         <CalendarIcon className="h-4 w-4 text-secondary-600" />
-                        <span className="font-medium">{camp.name}</span>
+                        <Link href={`/campamentos/${camp.id}`} className="font-medium">
+                          {camp.name}
+                        </Link>
                       </div>
                       <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <CalendarIcon className="h-3 w-3" />
-                          {formatCampDateRange(new Date(camp.startDate), new Date(camp.endDate))}
+                          <MapPin className="h-3 w-3" /> {camp.location}
                         </span>
                         <span className="flex items-center gap-1">
-                          <UsersIcon className="h-3 w-3" />
-                          {camp.participants} participante{camp.participants === 1 ? "" : "s"}
+                          <Clock className="h-3 w-3" />{' '}
+                          {new Date(camp.start_date).toLocaleDateString()} -{' '}
+                          {new Date(camp.end_date).toLocaleDateString()}
                         </span>
-                        {camp.pendingPayments > 0 && (
+                      </div>
+                    </div>
+                  </li>
+                ))
+              ) : (
+                <p className="text-muted-foreground">No hay campamentos recientes.</p>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tareas Prioritarias</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {data.priorityTasks.length > 0 ? (
+                data.priorityTasks.map((task) => (
+                  <li key={task.id} className="flex items-start gap-4">
+                    <CheckSquare className="mt-1 h-4 w-4 flex-shrink-0 text-primary-600" />
+                    <div className="flex-1 space-y-1">
+                      <p className="font-medium">{task.title}</p>
+                      <p className="text-sm text-muted-foreground">{task.description}</p>
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <CalendarIcon className="h-3 w-3" />{' '}
+                          Vence el {new Date(task.due_date).toLocaleDateString()}
+                        </span>
+                        {task.assignedTo && (
                           <span className="flex items-center gap-1">
-                            <DollarSign className="h-3 w-3" />
-                            {camp.pendingPayments} pago{camp.pendingPayments === 1 ? "" : "s"} pendiente{camp.pendingPayments === 1 ? "" : "s"}
+                            <UserCircle className="h-3 w-3" /> {task.assignedTo.full_name}
                           </span>
                         )}
                       </div>
                     </div>
-                    <Badge variant={statusVariant}>{camp.status}</Badge>
-                  </div>
-                );
-              })
-            )}
+                  </li>
+                ))
+              ) : (
+                <p className="text-muted-foreground">No hay tareas prioritarias.</p>
+              )}
+            </ul>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Tareas pendientes</CardTitle>
-            <CardDescription>
-              Tareas que requieren atención inmediata.
-            </CardDescription>
+            <CardTitle>Métricas Clave</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {data.tasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No hay tareas críticas en este momento.
-              </p>
-            ) : (
-              data.tasks.map((task) => {
-                const isHighPriority = task.priority === "Urgente" || task.priority === "Alta";
-                return (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between rounded-lg border border-border p-4"
-                  >
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle
-                          className={`h-4 w-4 ${isHighPriority ? "text-negative-600" : "text-secondary-600"}`}
-                        />
-                        <span className="font-medium">{task.title}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                        <Badge variant="outline" className="border-border text-muted-foreground">
-                          {task.module}
-                        </Badge>
-                        <span>{task.dueInLabel}</span>
-                      </div>
-                    </div>
-                    <Badge variant={isHighPriority ? "destructive" : "secondary"}>
-                      {task.priority}
-                    </Badge>
-                  </div>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section>
-        <Card>
-          <CardHeader>
-            <CardTitle>Estado de módulos</CardTitle>
-            <CardDescription>
-              Progreso de configuración y uso del sistema.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {data.modulesProgress.map((module) => (
-              <div key={module.id}>
-                <div className="mb-2 flex items-center justify-between text-sm font-medium">
-                  <span>{module.name}</span>
-                  <span className="text-muted-foreground">{module.progress}%</span>
-                </div>
-                <Progress value={module.progress} className="h-2" />
+          <CardContent>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Participantes Totales</p>
+                <p className="text-3xl font-bold">{numberFormatter.format(data.metrics.totalParticipants)}</p>
+                <Progress value={70} className="mt-2 h-2" />
               </div>
-            ))}
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Campamentos Activos</p>
+                <p className="text-3xl font-bold">{numberFormatter.format(data.metrics.activeCamps)}</p>
+                <Progress value={50} className="mt-2 h-2" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Ingresos Potenciales</p>
+                <p className="text-3xl font-bold">{currencyFormatter.format(data.metrics.potentialRevenue)}</p>
+                <Progress value={90} className="mt-2 h-2" />
+              </div>
+            </div>
           </CardContent>
         </Card>
       </section>

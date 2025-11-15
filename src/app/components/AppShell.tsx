@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import type { Session } from "next-auth";
+import { useRouter, usePathname } from "next/navigation";
 
 import { api } from "~/trpc/react";
 
@@ -9,6 +10,7 @@ import { ColorSystemPreview } from "./ColorSystemPreview";
 import { Dashboard } from "./Dashboard";
 import { PageHeader } from "./PageHeader";
 import { Sidebar } from "./Sidebar";
+import { OrganizationContext } from "~/app/hooks/useOrganization"; // Importar OrganizationContext
 
 const DEFAULT_MODULE = "inicio";
 const ALL_MODULE_IDS = [
@@ -31,23 +33,41 @@ type AppShellProps = {
   session: Session | null;
   signInAction: () => Promise<void>;
   signOutAction: () => Promise<void>;
+  children: React.ReactNode;
 };
 
 export function AppShell({
   session,
   signInAction,
   signOutAction,
+  children,
 }: AppShellProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  // Detectar el módulo actual desde la ruta
+  const detectedModule = React.useMemo(() => {
+    if (pathname === "/" || pathname === "/inicio") return "inicio";
+    const segments = pathname.split("/").filter(Boolean);
+    return segments[0] || DEFAULT_MODULE;
+  }, [pathname]);
+
   const [currentModule, setCurrentModule] =
-    React.useState<string>(DEFAULT_MODULE);
-  const [showColorSystem, setShowColorSystem] = React.useState<boolean>(true);
+    React.useState<string>(detectedModule);
+
+  // Sincronizar currentModule con la ruta
+  React.useEffect(() => {
+    setCurrentModule(detectedModule);
+  }, [detectedModule]);
 
   const {
     data: contextData,
     isLoading: contextLoading,
+    error: contextError,
   } = api.organization.getCurrentContext.useQuery(undefined, {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
+    retry: false,
   });
 
   const allowedModules = React.useMemo(() => {
@@ -67,54 +87,63 @@ export function AppShell({
   }, [allowedModules, currentModule]);
 
   const currentTitle = React.useMemo(() => {
-    if (showColorSystem) {
-      return "Sistema de colores";
-    }
-
     return currentModule === "inicio"
       ? "Panel general"
       : currentModule.replace(/-/g, " ");
-  }, [currentModule, showColorSystem]);
+  }, [currentModule]);
 
+  const handleModuleChange = (moduleId: string) => {
+    setCurrentModule(moduleId);
+    router.push(`/${moduleId}`);
+  };
+
+  const organizationContextValue = React.useMemo(() => ({
+    organizationId: contextData?.organization?.id,
+    organizationName: contextData?.organization?.name,
+    roleName: contextData?.role?.name,
+    allowedModules: allowedModules,
+    isLoading: contextLoading,
+    error: contextError ? new Error(contextError.message) : null,
+  }), [contextData, allowedModules, contextLoading, contextError]);
+
+  // Asegurar que el Provider siempre tenga un valor válido
   return (
     <div className="app-shell-container">
-      {/* Sidebar - Fixed position with floating effect */}
-      <aside className="app-shell-sidebar">
-        <Sidebar
-          currentModule={currentModule}
-          onModuleChange={setCurrentModule}
-          onToggleColorSystem={() =>
-            setShowColorSystem((previous) => !previous)
-          }
-          showColorSystem={showColorSystem}
-          allowedModules={allowedModules}
-          isLoading={contextLoading}
-        />
-      </aside>
+      <OrganizationContext.Provider value={organizationContextValue}>
+        {/* Sidebar - Fixed position with floating effect */}
+        <aside className="app-shell-sidebar">
+          <Sidebar
+            currentModule={currentModule}
+            onModuleChange={handleModuleChange}
+            allowedModules={allowedModules}
+            isLoading={contextLoading}
+          />
+        </aside>
 
-      {/* Top Bar - Fixed position with floating effect */}
-      <header className="app-shell-topbar">
-        <PageHeader
-          title={currentTitle}
-          description="CampamentOS prioriza información clara y organizada para que administres tus campamentos sin distracciones."
-          session={session}
-          signInAction={signInAction}
-          signOutAction={signOutAction}
-          organizationName={contextData?.organization?.name ?? undefined}
-          roleName={contextData?.role?.name ?? undefined}
-        />
-      </header>
+        {/* Top Bar - Fixed position with floating effect */}
+        <header className="app-shell-topbar">
+          <PageHeader
+            title={currentTitle}
+            description="CampamentOS prioriza información clara y organizada para que administres tus campamentos sin distracciones."
+            session={session}
+            signInAction={signInAction}
+            signOutAction={signOutAction}
+            organizationName={contextData?.organization?.name ?? undefined}
+            roleName={contextData?.role?.name ?? undefined}
+          />
+        </header>
 
-      {/* Main Content - Floating container with rounded corners */}
-      <div className="app-shell-content">
-        <main className="app-shell-content-inner">
-          {showColorSystem ? (
-            <ColorSystemPreview onClose={() => setShowColorSystem(false)} />
-          ) : (
-            <Dashboard currentModule={currentModule} />
-          )}
-        </main>
-      </div>
+        {/* Main Content - Floating container with rounded corners */}
+        <div className="app-shell-content">
+          <main className="app-shell-content-inner">
+            {pathname === "/" || pathname === "/inicio" ? (
+              <Dashboard currentModule={currentModule} />
+            ) : (
+              children
+            )}
+          </main>
+        </div>
+      </OrganizationContext.Provider> {/* Cerrar el Provider */}
     </div>
   );
 }

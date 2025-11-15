@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, organizationProcedure } from "../trpc";
+import { TRPCError } from "@trpc/server";
 
 export const personRouter = createTRPCRouter({
   create: protectedProcedure
@@ -90,5 +91,47 @@ export const personRouter = createTRPCRouter({
         },
       });
       return person;
+    }),
+
+  searchPersons: organizationProcedure
+    .input(z.object({ query: z.string(), organizationId: z.number() }))
+    .query(async ({ input, ctx }) => {
+      return ctx.db.person.findMany({
+        where: {
+          full_name: { contains: input.query, mode: 'insensitive' },
+          organizations: {
+            some: { organization_id: input.organizationId },
+          },
+        },
+        select: {
+          id: true,
+          full_name: true,
+        },
+        take: 10, // Limitar resultados de búsqueda
+      });
+    }),
+
+  addParticipantToCamp: organizationProcedure
+    .input(z.object({ personId: z.number(), campId: z.number(), organizationId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const existingParticipation = await ctx.db.campParticipation.findUnique({
+        where: {
+          person_id_camp_id: {
+            person_id: input.personId,
+            camp_id: input.campId,
+          },
+        },
+      });
+
+      if (existingParticipation) {
+        throw new TRPCError({ code: "CONFLICT", message: "Esta persona ya es participante de este campamento." });
+      }
+
+      return ctx.db.campParticipation.create({
+        data: {
+          person_id: input.personId,
+          camp_id: input.campId,
+        },
+      });
     }),
 });

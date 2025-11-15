@@ -99,9 +99,7 @@ const ALL_MODULE_IDS = MODULE_SECTIONS.flatMap((section) =>
 
 type SidebarProps = {
   currentModule: string;
-  showColorSystem: boolean;
   onModuleChange: (moduleId: string) => void;
-  onToggleColorSystem: () => void;
   allowedModules?: string[];
   isLoading?: boolean;
 };
@@ -109,8 +107,6 @@ type SidebarProps = {
 export function Sidebar({
   currentModule,
   onModuleChange,
-  onToggleColorSystem: _onToggleColorSystem,
-  showColorSystem: _showColorSystem,
   allowedModules,
   isLoading = false,
 }: SidebarProps) {

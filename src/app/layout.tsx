@@ -6,11 +6,12 @@ import "~/styles/globals.css";
 
 import { TRPCReactProvider } from "~/trpc/react";
 import { ThemeProvider } from "./providers/ThemeProvider";
+import { AppShellWrapper } from "./components/AppShellWrapper";
 
 export const metadata: Metadata = {
   title: "campamentOS",
-  description: "Orquesta campamentos, personas, logística y presupuesto desde un solo lugar.",
-  icons: [{ rel: "icon", url: "/favicon.svg" }],
+  description: "Plataforma integral para campamentos, expediciones y aventuras épicas.",
+  icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
 const geist = Geist({
@@ -20,13 +21,17 @@ const geist = Geist({
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" className={geist.variable} suppressHydrationWarning>
       <body className="bg-background font-sans text-foreground antialiased">
         <SessionProvider>
           <ThemeProvider>
-            <TRPCReactProvider>{children}</TRPCReactProvider>
+            <TRPCReactProvider>
+              <AppShellWrapper>{children}</AppShellWrapper>
+            </TRPCReactProvider>
           </ThemeProvider>
         </SessionProvider>
       </body>
