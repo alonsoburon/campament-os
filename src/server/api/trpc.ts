@@ -13,6 +13,7 @@ import { ZodError } from "zod";
 
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+import { uncachedAuth } from "~/server/auth";
 
 /**
  * 1. CONTEXT
@@ -27,7 +28,22 @@ import { db } from "~/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const session = await auth();
+  // Usar uncachedAuth para evitar problemas con el cache de React
+  // que puede cachear sesiones incorrectas después del switch de usuario
+  const session = await uncachedAuth();
+  
+  // Debug logging en desarrollo
+  if (process.env.NODE_ENV === "development") {
+    const cookieHeader = opts.headers.get("cookie");
+    const hasSessionCookie = cookieHeader?.includes("authjs.session-token") || cookieHeader?.includes("__Secure-authjs.session-token");
+    console.log("[tRPC Context] Session exists:", !!session);
+    console.log("[tRPC Context] Has session cookie:", hasSessionCookie);
+    if (session?.user) {
+      console.log("[tRPC Context] User ID:", session.user.id);
+    } else {
+      console.log("[tRPC Context] No user in session");
+    }
+  }
 
   return {
     db,
