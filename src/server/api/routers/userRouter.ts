@@ -66,7 +66,7 @@ export const userRouter = createTRPCRouter({
   }),
   acceptInvitation: protectedProcedure
     .input(z.object({ token: z.string() }))
-    .mutation(async ({ ctx: _ctx, input: _input }) => {
+    .mutation(async () => {
       // TODO: Implement invitation acceptance logic
       throw new Error("Not implemented");
     }),

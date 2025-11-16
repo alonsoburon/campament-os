@@ -105,19 +105,15 @@ const ParticipantsTab = ({ campId }: ParticipantsTabProps) => {
           {isLoadingParticipants && <p>Cargando participantes...</p>}
           {participantsError && <p className="text-red-500">Error: {participantsError.message}</p>}
           {participants && participants.length === 0 && <p className="text-muted-foreground">No hay participantes en este campamento.</p>}
-          {participants && participants.length > 0 && (
-            <ul className="space-y-2">
-              {participants.map((participation) => (
-                <li key={participation.person.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50">
-                  <CircleUser className="h-5 w-5 text-muted-foreground" />
-                  <span>{participation.person.full_name}</span>
-                  <span className={`text-sm font-medium ${participation.payment_made ? "text-green-600" : "text-orange-600"}`}>
-                    ({participation.payment_made ? "Pagado" : "Pendiente"})
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+          {participants?.map((participation) => (
+            <li key={participation.person.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50">
+              <CircleUser className="h-5 w-5 text-muted-foreground" />
+              <span>{participation.person.full_name}</span>
+              <span className={`text-sm font-medium ${participation.payment_made ? "text-green-600" : "text-orange-600"}`}>
+                ({participation.payment_made ? "Pagado" : "Pendiente"})
+              </span>
+            </li>
+          ))}
         </CardContent>
       </Card>
     </div>

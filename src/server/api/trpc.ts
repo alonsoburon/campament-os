@@ -16,21 +16,22 @@ import { db } from "~/server/db";
 
 // Tipos derivados de la sesión de Better Auth, extendidos con campos extra usados en la app
 type SessionResult = Awaited<ReturnType<typeof auth.api.getSession>>;
-type BaseSessionUser = SessionResult extends { user: infer U } ? U : Record<string, unknown>;
-type SessionUser = BaseSessionUser & {
-  person_id?: number | null;
-  organization_id?: number | null;
-  organization_name?: string | null;
-  role_name?: string | null;
-};
+type SessionUser = (SessionResult & {
+  user: {
+    person_id?: number | null;
+    organization_id?: number | null;
+    organization_name?: string | null;
+    role_name?: string | null;
+  };
+})["user"];
+
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const session = await auth.api.getSession({ headers: opts.headers });
-  const user = session?.user as SessionUser | undefined;
-
+  
   return {
     db,
-    user,
+    user: session?.user as SessionUser | undefined,
     resHeaders: new Headers(),
   };
 };
@@ -94,7 +95,6 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
     include: { system_role: true },
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
   const roleName = user?.system_role?.name;
   if (roleName !== "Superadmin") {
     throw new TRPCError({ code: "FORBIDDEN" });

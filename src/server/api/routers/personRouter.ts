@@ -13,6 +13,14 @@ export const personRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const personId = ctx.user.person_id;
+      if (!personId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "El usuario debe tener una persona asociada para realizar esta acción.",
+        });
+      }
+
       const person = await ctx.db.$transaction(async (prisma) => {
         let p;
 
