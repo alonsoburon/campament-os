@@ -42,4 +42,38 @@ export const campRouter = router({
         include: { person: true },
       });
     }),
+
+  searchPersons: orgProtectedProcedure
+    .input(z.object({ query: z.string(), organizationId: z.number() }))
+    .query(async ({ input, ctx }) => {
+      return ctx.db.person.findMany({
+        where: {
+          full_name: { contains: input.query, mode: 'insensitive' },
+          organizations: {
+            some: { organization_id: input.organizationId }
+          }
+        },
+        select: {
+          id: true,
+          full_name: true,
+        },
+        take: 10,
+      });
+    }),
+
+  addParticipantToCamp: orgProtectedProcedure
+    .input(z.object({
+      campId: z.number(),
+      personId: z.number(),
+      organizationId: z.number(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      return ctx.db.campParticipation.create({
+        data: {
+          camp_id: input.campId,
+          person_id: input.personId,
+          payment_made: false,
+        },
+      });
+    }),
 });

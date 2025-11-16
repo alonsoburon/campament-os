@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
-import { auth } from "~/server/auth";
 
 export const personRouter = createTRPCRouter({
   createOrUpdatePerson: protectedProcedure
@@ -19,14 +18,15 @@ export const personRouter = createTRPCRouter({
 
         // Si el usuario ya tiene un person_id, actualiza el registro existente
         if (ctx.user.person_id) {
+          const personId = ctx.user.person_id;
           p = await prisma.person.update({
-            where: { id: ctx.user.person_id },
+            where: { id: personId },
             data: {
               full_name: input.fullName,
               phone: input.phone,
               emergency_contact: input.emergencyContact,
               birth_date: input.birthDate,
-              updater_id: ctx.user.person_id,
+              updater_id: personId,
             },
           });
         } else {
@@ -75,8 +75,9 @@ export const personRouter = createTRPCRouter({
       });
     }
 
+    const personId = ctx.user.person_id;
     return ctx.db.person.findUnique({
-      where: { id: ctx.user.person_id },
+      where: { id: personId },
     });
   }),
 });

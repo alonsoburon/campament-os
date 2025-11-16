@@ -76,9 +76,11 @@ export default function RegisterPage() {
 
   const acceptInvitation = api.user.acceptInvitation.useMutation({
     onSuccess: () => {
+      console.log("Invitación aceptada!");
       router.push("/api/auth/signin");
     },
     onError: (error) => {
+      // El acceso a `error.message` es seguro.
       form.setError("invitationToken", { message: error.message });
     },
   });

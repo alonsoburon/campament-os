@@ -202,10 +202,6 @@ export async function seedDemoData(db: PrismaClient) {
     skipDuplicates: true,
   });
 
-  const branches = await db.branch.findMany({
-    where: { organization_id: organization.id },
-  });
-
   const roleMap = new Map<string, number>();
   for (const roleDefinition of ORG_ROLE_DEFINITIONS) {
     const role = await db.role.upsert({

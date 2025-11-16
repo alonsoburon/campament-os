@@ -33,7 +33,7 @@ export async function middleware(request: NextRequest) {
 
 	// Comprobar sesión sin importar Prisma en Edge:
 	// consultamos el endpoint interno de Better Auth reenviando cookies.
-	let session: unknown = null;
+	let session: { user?: { person_id?: number | null } } | null = null;
 	try {
 		const url = new URL("/api/auth/get-session", request.url);
 		const res = await fetch(url, {
@@ -43,24 +43,24 @@ export async function middleware(request: NextRequest) {
 			cache: "no-store",
 		});
 		if (res.ok) {
-			session = await res.json();
+			const data: unknown = await res.json();
+      if (typeof data === 'object' && data !== null && 'user' in data) {
+        session = data as { user?: { person_id?: number | null } };
+      }
 		}
 	} catch {
 		// ignorar y seguir con session = null
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const s = session as any;
-
 	// Si el usuario ya tiene un perfil de persona y está en la página de onboarding, redirigir al dashboard
-	if (s?.user?.person_id && pathname === "/onboarding/create-person") {
+	if (session?.user?.person_id && pathname === "/onboarding/create-person") {
 		const url = request.nextUrl.clone();
 		url.pathname = "/";
 		return NextResponse.redirect(url);
 	}
 
 	// No autenticado => login
-	if (!s?.user) {
+	if (!session?.user) {
 		// Redirigir a la página de login (auto-inicia Google)
 		const url = request.nextUrl.clone();
 		url.pathname = "/login";
@@ -72,7 +72,7 @@ export async function middleware(request: NextRequest) {
 	}
 
 	// Autenticado pero sin persona => onboarding de persona
-	if (!s.user.person_id && pathname !== "/onboarding/create-person") {
+	if (session.user && !session.user.person_id && pathname !== "/onboarding/create-person") {
 		const url = request.nextUrl.clone();
 		url.pathname = "/onboarding/create-person";
 		if (!pathname.startsWith("/api/")) {
@@ -90,5 +90,3 @@ export const config = {
 		"/((?!api/.*|_next/.*|favicon.ico|campamentOS-typography.svg|favicon.svg).*)",
 	],
 };
-
-

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TRPCError } from "@trpc/server";
 
 export const userRouter = createTRPCRouter({
   // Devuelve los datos del usuario actual, incluyendo el ID de la persona asociada
@@ -43,23 +42,32 @@ export const userRouter = createTRPCRouter({
       },
     });
     return users
-      .filter((user) => user.person !== null)
+      .filter(
+        (user): user is typeof user & { person: NonNullable<typeof user.person> } =>
+          user.person !== null
+      )
       .map((user) => ({
         userId: user.id,
         fullName:
-          user.person?.full_name ??
+          user.person.full_name ??
           user.name ??
           user.email ??
           "Usuario sin nombre",
         email: user.email,
-        personId: user.person!.id,
-        isCurrent: user.id === ctx.user.id,
-        memberships: user.person!.organizations.map((membership) => ({
+        personId: user.person.id,
+        memberships: user.person.organizations.map((membership) => ({
           organizationId: membership.organization_id,
           organizationName: membership.organization.name,
           roleId: membership.role_id,
           roleName: membership.role.name,
         })),
+        isCurrent: user.id === ctx.user.id,
       }));
   }),
+  acceptInvitation: protectedProcedure
+    .input(z.object({ token: z.string() }))
+    .mutation(async ({ ctx: _ctx, input: _input }) => {
+      // TODO: Implement invitation acceptance logic
+      throw new Error("Not implemented");
+    }),
 });

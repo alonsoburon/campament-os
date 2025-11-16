@@ -66,7 +66,7 @@ export const organizationRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        name: z.string(),
+        name: z.string().min(3),
         type_id: z.number(),
         number: z.number().optional(),
         district: z.string().optional(),
@@ -84,9 +84,10 @@ export const organizationRouter = createTRPCRouter({
       if (!ctx.user.person_id) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "El usuario no tiene una persona asociada.",
+          message: "El usuario debe tener una persona asociada para crear una organización.",
         });
       }
+
       const personId = ctx.user.person_id;
 
       const defaultRoleDefinitions = [
@@ -128,7 +129,7 @@ export const organizationRouter = createTRPCRouter({
         "Kraal / Dirección",
       ];
 
-      const { organization } = await ctx.db.$transaction(async (tx) => {
+      const organization = await ctx.db.$transaction(async (tx) => {
         const createdOrganization = await tx.organization.create({
           data: {
             name: input.name,
@@ -185,7 +186,7 @@ export const organizationRouter = createTRPCRouter({
           },
         });
 
-        return { organization: createdOrganization };
+        return createdOrganization;
       });
 
       return organization;
@@ -228,19 +229,8 @@ export const organizationRouter = createTRPCRouter({
           id: input.id,
         },
         data: {
-          name: input.name,
-          type_id: input.type_id,
-          number: input.number,
-          district: input.district,
-          zone: input.zone,
-          address: input.address,
-          phone: input.phone,
-          group_email: input.group_email,
-          is_mixed: input.is_mixed,
-          foundation_date: input.foundation_date,
-          primary_color: input.primary_color,
-          secondary_color: input.secondary_color,
-          updater_id: ctx.user.person_id ?? undefined, // Actualizar el actualizador
+          ...input,
+          updater_id: ctx.user.person_id,
         },
       });
       return organization;
@@ -253,17 +243,15 @@ export const organizationRouter = createTRPCRouter({
   }),
 
   getCurrentContext: protectedProcedure.query(async ({ ctx }) => {
-    const personId = ctx.user.person_id;
-    const organizationId = ctx.user.organization_id;
-    const organizationName = ctx.user.organization_name;
-    const roleName = ctx.user.role_name;
-
-    if (!personId) {
+    if (!ctx.user.person_id) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "El usuario no tiene una persona asociada.",
       });
     }
+
+    const personId = ctx.user.person_id;
+    const organizationId = ctx.user.organization_id;
 
     if (!organizationId) {
       return {
@@ -273,26 +261,6 @@ export const organizationRouter = createTRPCRouter({
       };
     }
 
-    // OPTIMIZACIÓN: Si la sesión ya tiene toda la info, NO hacer query a la BD
-    if (organizationName && roleName) {
-      const roleNameNormalized = normalizeRoleName(roleName);
-      const allowedModules =
-        ROLE_MODULES[roleNameNormalized] ?? (["inicio"] as (typeof ALL_MODULES)[number][]);
-
-      return {
-        organization: {
-          id: organizationId,
-          name: organizationName,
-        },
-        role: {
-          id: 0, // No tenemos el role_id en la sesión, pero no es crítico
-          name: roleName,
-        },
-        allowedModules,
-      };
-    }
-
-    // Fallback: Si no está en la sesión, hacer la query (solo en casos raros)
     const membership = await ctx.db.organizationMember.findUnique({
       where: {
         person_id_organization_id: {

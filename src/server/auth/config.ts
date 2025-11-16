@@ -33,6 +33,72 @@ async function ensureSuperadminRole() {
   });
 }
 
+async function isUserAllowedToSignIn(email: string, emailVerified: boolean) {
+  try {
+
+    // Solo permitimos el acceso al correo autorizado y verificado.
+    if (!emailVerified || email !== AUTHORIZED_EMAIL) {
+      return false;
+    }
+
+    if (email === AUTHORIZED_EMAIL) {
+      const superadminRole = await ensureSuperadminRole();
+      const existingUser = await db.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          person_id: true,
+          system_role_id: true,
+          name: true,
+        },
+      });
+
+      if (existingUser) {
+        if (
+          existingUser.system_role_id !== superadminRole.id ||
+          existingUser.name !== SUPERADMIN_FULL_NAME
+        ) {
+          await db.user.update({
+            where: { id: existingUser.id },
+            data: {
+              name: SUPERADMIN_FULL_NAME,
+              system_role_id: superadminRole.id,
+            },
+          });
+        }
+
+        await db.person.update({
+          where: { id: existingUser.person_id ?? undefined },
+          data: { full_name: SUPERADMIN_FULL_NAME },
+        });
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error("Database check failed during sign-in:", error);
+    return false;
+  }
+}
+
+interface BetterAuthAccount {
+  providerId?: string;
+}
+
+interface GoogleProfile {
+  email?: string;
+  email_verified?: boolean;
+}
+
+interface SessionUser {
+    id: string;
+    person_id?: number | null;
+    role_name?: string | null;
+}
+
+interface Session {
+    user?: SessionUser;
+}
+
 export const authConfig = {
   database: prismaAdapter(db, {
     provider: "postgresql",
@@ -49,7 +115,7 @@ export const authConfig = {
     },
   },
   callbacks: {
-    async signIn({ account, profile }: { account: any; profile: any }) {
+    async signIn({ account, profile }: { account: BetterAuthAccount | null, profile: GoogleProfile | null }) {
       // Permitir autenticación del proveedor de personificación en desarrollo
       if (
         account?.providerId === "impersonate" &&
@@ -58,67 +124,26 @@ export const authConfig = {
         return true;
       }
 
-      if (account?.providerId !== "google") {
-        return false;
-      }
-
-      const email = typeof profile?.email === "string" ? profile.email : undefined;
-      const emailVerified =
-        typeof profile?.email_verified === "boolean"
-          ? profile.email_verified
-          : false;
-
-      // Solo permitimos el acceso al correo autorizado y verificado.
-      if (!emailVerified || email !== AUTHORIZED_EMAIL) {
-        return false;
-      }
-
-      if (email === AUTHORIZED_EMAIL) {
-        const superadminRole = await ensureSuperadminRole();
-        const existingUser = await db.user.findUnique({
-          where: { email },
-          select: {
-            id: true,
-            person_id: true,
-            system_role_id: true,
-            name: true,
-          },
-        });
-
-        if (existingUser) {
-          if (
-            existingUser.system_role_id !== superadminRole.id ||
-            existingUser.name !== SUPERADMIN_FULL_NAME
-          ) {
-            await db.user.update({
-              where: { id: existingUser.id },
-              data: {
-                name: SUPERADMIN_FULL_NAME,
-                system_role_id: superadminRole.id,
-              },
-            });
-          }
-
-          await db.person.update({
-            where: { id: existingUser.person_id ?? undefined },
-            data: { full_name: SUPERADMIN_FULL_NAME },
-          });
-        }
+      // Para otros proveedores como Google, verificar el dominio y la existencia en la BD
+      if (profile?.email && profile.email_verified) {
+        return await isUserAllowedToSignIn(profile.email, profile.email_verified);
       }
 
       return true;
     },
-    async session({ session, user }) {
+    async session({ session, user }: { session: Session; user: SessionUser }) {
       // Asegúrate de que person_id esté siempre actualizado en la sesión
-      if (user.id) {
+      if (session.user && user.id) {
         const dbUser = await db.user.findUnique({
           where: { id: user.id },
-          select: { person_id: true, system_role: { select: { name: true } } },
+          include: {
+            system_role: true,
+          },
         });
 
         if (dbUser) {
           session.user.person_id = dbUser.person_id;
-          session.user.role_name = dbUser.system_role?.name || null;
+          session.user.role_name ??= dbUser.system_role?.name ?? null;
         }
       }
       return session;

@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "~/trpc/react";
 import { Button } from "~/app/components/ui/button";
 import { Input } from "~/app/components/ui/input";
-import { useSession, signIn } from "~/lib/auth-client";
+import { useSession } from "~/lib/auth-client";
 import { PhoneNumberInput } from "~/app/components/ui/phone-input";
 import {
   Form,
@@ -28,11 +27,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function CreatePersonPage() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const redirectTo = params.get("redirectTo") ?? "/";
   const { data: session } = useSession();
-  // const { signIn } = api.auth.useContext().signIn; // Eliminado
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -40,10 +35,10 @@ export default function CreatePersonPage() {
   });
 
   const mutation = api.person.createOrUpdatePerson.useMutation({
-    onSuccess: () => {
-      // Ya no esperamos la actualización, forzamos la recarga directamente.
-      // La base de datos ya está actualizada, la nueva carga de página
-      // hará que el middleware lea la sesión fresca.
+    onSuccess: async () => {
+      // Esperar un momento para que la sesión se actualice en el servidor
+      await new Promise(resolve => setTimeout(resolve, 500));
+      // Forzar recarga completa para obtener la sesión actualizada
       window.location.href = "/";
     },
   });

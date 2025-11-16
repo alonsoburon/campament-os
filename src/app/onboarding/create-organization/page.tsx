@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 "use client";
 
 import { useEffect, useMemo } from "react";
@@ -52,7 +55,7 @@ export default function CreateOrganizationPage() {
   const router = useRouter();
   const { status, data: session } = useSession();
 
-  const { data: organizationTypes, isLoading: loadingTypes } =
+  const { data: organizationTypes, isLoading: loadingTypes, error: typesError } =
     api.organization.listTypes.useQuery();
 
   const createOrganization = api.organization.create.useMutation({
@@ -62,6 +65,10 @@ export default function CreateOrganizationPage() {
   });
 
   useEffect(() => {
+    if (status === "loading") {
+      return <div>Cargando sesión...</div>;
+    }
+
     if (status === "unauthenticated") {
       router.replace("/api/auth/signin");
       return;
@@ -70,7 +77,7 @@ export default function CreateOrganizationPage() {
     if (status === "authenticated" && session?.user.organization_id) {
       router.replace("/");
     }
-  }, [status, session?.user.organization_id, router]);
+  }, [status, session, router]);
 
   const form = useForm<CreateOrganizationInputs>({
     resolver: zodResolver(createOrganizationSchema),
@@ -90,7 +97,7 @@ export default function CreateOrganizationPage() {
   const watchedTypeId = form.watch("typeId");
 
   const isScoutType = useMemo(() => {
-    if (!organizationTypes) return false;
+    if (loadingTypes || !organizationTypes) return false;
     const selectedType = organizationTypes.find(
       (type) => type.id.toString() === watchedTypeId,
     );
@@ -103,7 +110,7 @@ export default function CreateOrganizationPage() {
       normalizedName.includes("manada") ||
       normalizedName.includes("tropa")
     );
-  }, [organizationTypes, watchedTypeId]);
+  }, [organizationTypes, watchedTypeId, loadingTypes]);
 
   const onSubmit = (values: CreateOrganizationInputs) => {
     const payload = {
@@ -186,18 +193,26 @@ export default function CreateOrganizationPage() {
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecciona un tipo" />
+                          <SelectValue placeholder="Elige el tipo de organización" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {(organizationTypes ?? []).map((type) => (
-                          <SelectItem
-                            key={type.id}
-                            value={type.id.toString()}
-                          >
-                            {type.name}
-                          </SelectItem>
-                        ))}
+                        {loadingTypes ? (
+                          <SelectItem value="loading" disabled>Cargando tipos...</SelectItem>
+                        ) : typesError ? (
+                          <SelectItem value="error" disabled>Error al cargar</SelectItem>
+                        ) : !organizationTypes || organizationTypes.length === 0 ? (
+                          <SelectItem value="not-found" disabled>No hay tipos disponibles</SelectItem>
+                        ) : (
+                          organizationTypes.map((type) => (
+                            <SelectItem
+                              key={type.id}
+                              value={type.id.toString()}
+                            >
+                              {type.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />

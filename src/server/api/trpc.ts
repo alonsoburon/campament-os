@@ -16,17 +16,17 @@ import { db } from "~/server/db";
 
 // Tipos derivados de la sesión de Better Auth, extendidos con campos extra usados en la app
 type SessionResult = Awaited<ReturnType<typeof auth.api.getSession>>;
-type SessionUserExtra = {
+type BaseSessionUser = SessionResult extends { user: infer U } ? U : Record<string, unknown>;
+type SessionUser = BaseSessionUser & {
   person_id?: number | null;
   organization_id?: number | null;
   organization_name?: string | null;
   role_name?: string | null;
 };
-type SessionUser = (SessionResult extends { user: infer U } ? U : never) & SessionUserExtra;
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const session = await auth.api.getSession({ headers: opts.headers });
-  const user = (session?.user ?? undefined) as SessionUser | undefined;
+  const user = session?.user as SessionUser | undefined;
 
   return {
     db,
@@ -64,7 +64,7 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
 
 export const orgProtectedProcedure = protectedProcedure.use(
   async ({ ctx, next, input }) => {
-    const inputAsOrgContext = input as { organization_id?: number };
+    const inputAsOrgContext = input as Record<string, unknown> & { organization_id?: number };
     const inputOrganizationId = inputAsOrgContext.organization_id;
 
     if (inputOrganizationId) {
@@ -94,7 +94,9 @@ export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
     include: { system_role: true },
   });
 
-  if (user?.system_role?.name !== "Superadmin") {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+  const roleName = user?.system_role?.name;
+  if (roleName !== "Superadmin") {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
 

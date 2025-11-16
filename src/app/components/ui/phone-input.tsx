@@ -8,20 +8,21 @@ import {
   FormLabel,
   FormMessage,
 } from '~/app/components/ui/form';
+import { type UseFormReturn } from "react-hook-form";
 
 interface PhoneNumberInputProps {
   name: string;
   label?: string;
   placeholder?: string;
-  form: any;
+  form: UseFormReturn<Record<string, unknown>>;
 }
 
-const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
+export function PhoneNumberInput({
   name,
   label,
   placeholder,
   form,
-}) => {
+}: PhoneNumberInputProps) {
   return (
     <FormField
       control={form.control}
@@ -32,7 +33,7 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
           <FormControl>
             <PhoneInput
               country={'cl'}
-              value={field.value}
+              value={field.value as string | undefined}
               onChange={field.onChange}
               placeholder={placeholder}
               containerClass="flex items-center w-full rounded-md border border-input bg-background text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
@@ -46,6 +47,4 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
       )}
     />
   );
-};
-
-export { PhoneNumberInput };
+}

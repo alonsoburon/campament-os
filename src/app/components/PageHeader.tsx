@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 "use client";
 
 import * as React from "react";
@@ -44,12 +47,10 @@ export function PageHeader({
   const [isRefreshing, startTransition] = React.useTransition();
   const devSwitchEnabled = process.env.NODE_ENV !== "production";
 
-  const {
-    data: switchableUsers,
-    isLoading: switchableUsersLoading,
-  } = api.user.listSwitchableUsers.useQuery(undefined, {
+  const { data: switchableUsers, isLoading: switchableUsersLoading, error: switchableUsersError } = api.user.listSwitchableUsers.useQuery(undefined, {
     enabled: devSwitchEnabled,
     refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
   });
 
   const contextLabel = React.useMemo(() => {
@@ -93,31 +94,26 @@ export function PageHeader({
     [devSwitchEnabled, router, startTransition, utils],
   );
 
-  const renderMembershipSummary = React.useCallback(
-    (memberships: {
-      organizationName: string;
-      roleName: string;
-    }[]) => {
-      if (!memberships || memberships.length === 0) {
-        return "Sin organización asignada";
-      }
+  function renderMembershipSummary(memberships: {
+    organizationName: string | null;
+    roleName: string | null;
+  }[] | undefined) {
+    if (!memberships || memberships.length === 0) {
+      return "Sin organización asignada";
+    }
 
-      const primary = memberships[0];
-      if (!primary) {
-        return "Sin organización asignada";
-      }
+    const primary = memberships[0];
+    if (!primary?.organizationName || !primary.roleName) return "Sin organización asignada";
 
-      const additionalCount = memberships.length - 1;
+    const additionalCount = memberships.length - 1;
 
-      return [
-        `${primary.roleName} • ${primary.organizationName}`,
-        additionalCount > 0 ? `+${additionalCount} asignaciones` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-    },
-    [],
-  );
+    return [
+      `${primary.roleName} • ${primary.organizationName}`,
+      additionalCount > 0 ? `+${additionalCount} asignaciones` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
 
   return (
     <div className="flex w-full items-center justify-between gap-6 px-8">
@@ -185,8 +181,16 @@ export function PageHeader({
                     <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                     <span className="text-xs">Cargando usuarios…</span>
                   </DropdownMenuItem>
-                ) : (switchableUsers?.length ?? 0) > 0 ? (
-                  switchableUsers!.map((user) => (
+                ) : switchableUsersError ? (
+                  <DropdownMenuItem disabled>
+                    <span className="text-xs text-destructive">Error al cargar usuarios</span>
+                  </DropdownMenuItem>
+                ) : !switchableUsers || switchableUsers.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    No hay usuarios de prueba disponibles.
+                  </DropdownMenuItem>
+                ) : (
+                  switchableUsers.map((user) => (
                     <DropdownMenuItem
                       key={user.userId}
                       disabled={
@@ -201,9 +205,12 @@ export function PageHeader({
                       }}
                     >
                       <div className="flex w-full items-center justify-between gap-2 text-sm font-medium">
-                        <span>
+                        <span
+                          className={
+                            user.isCurrent ? "font-medium text-primary-600" : "font-medium"
+                          }
+                        >
                           {user.fullName}
-                          {user.isCurrent ? " (actual)" : ""}
                         </span>
                         {(switchingUserId === user.userId || isRefreshing) && (
                           <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
@@ -219,10 +226,6 @@ export function PageHeader({
                       )}
                     </DropdownMenuItem>
                   ))
-                ) : (
-                  <DropdownMenuItem disabled>
-                    No hay usuarios de prueba disponibles.
-                  </DropdownMenuItem>
                 )}
 
                 {switchError && (

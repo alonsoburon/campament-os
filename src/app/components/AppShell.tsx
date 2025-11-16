@@ -6,7 +6,6 @@ import { useRouter, usePathname } from "next/navigation";
 
 import { api } from "~/trpc/react";
 
-import { ColorSystemPreview } from "./ColorSystemPreview";
 import { Dashboard } from "./Dashboard";
 import { PageHeader } from "./PageHeader";
 import { Sidebar } from "./Sidebar";
@@ -45,7 +44,7 @@ export function AppShell({
   const detectedModule = React.useMemo(() => {
     if (pathname === "/" || pathname === "/inicio") return "inicio";
     const segments = pathname.split("/").filter(Boolean);
-    return segments[0] || DEFAULT_MODULE;
+    return segments[0] ?? DEFAULT_MODULE;
   }, [pathname]);
 
   const [currentModule, setCurrentModule] =
@@ -66,14 +65,32 @@ export function AppShell({
     retry: false,
   });
 
-  const allowedModules = React.useMemo(() => {
-    const serverModules = contextData?.allowedModules ?? null;
-    const fallback = ALL_MODULE_IDS as unknown as string[];
-    if (!serverModules || serverModules.length === 0) {
-      return fallback;
+  const organizationContextValue = React.useMemo(() => {
+    if (contextLoading || !contextData) {
+      return {
+        organizationId: undefined,
+        organizationName: undefined,
+        roleName: undefined,
+        isLoading: true,
+        error: contextError,
+      };
     }
-    return Array.from(new Set(["inicio", ...serverModules])) as string[];
-  }, [contextData?.allowedModules]);
+    return {
+      organizationId: contextData.organization?.id,
+      organizationName: contextData.organization?.name,
+      roleName: contextData.role?.name,
+      isLoading: false,
+      error: null,
+    };
+  }, [contextData, contextLoading, contextError]);
+
+  const allowedModules = React.useMemo(() => {
+    if (contextLoading || !contextData) {
+      return ALL_MODULE_IDS as unknown as string[];
+    }
+    const serverModules = contextData.allowedModules ?? [];
+    return Array.from(new Set(["inicio", ...serverModules]));
+  }, [contextData, contextLoading]);
 
   React.useEffect(() => {
     if (!allowedModules.includes(currentModule)) {
@@ -93,16 +110,18 @@ export function AppShell({
     router.push(`/${moduleId}`);
   };
 
-  const organizationContextValue = React.useMemo(() => ({
-    organizationId: contextData?.organization?.id,
-    organizationName: contextData?.organization?.name,
-    roleName: contextData?.role?.name,
-    allowedModules: allowedModules,
-    isLoading: contextLoading,
-    error: contextError ? new Error(contextError.message) : null,
-  }), [contextData, allowedModules, contextLoading, contextError]);
+  if (contextLoading) {
+    return <div>Cargando...</div>; // O un componente de esqueleto más sofisticado
+  }
 
-  // Asegurar que el Provider siempre tenga un valor válido
+  if (contextError) {
+    return <div>Error al cargar el contexto: {contextError.message}</div>;
+  }
+
+  if (!contextData) {
+    return <div>No se encontró el contexto de la organización.</div>;
+  }
+  
   return (
     <div className="app-shell-container">
       <OrganizationContext.Provider value={organizationContextValue}>
@@ -122,8 +141,8 @@ export function AppShell({
             title={currentTitle}
             description="CampamentOS prioriza información clara y organizada para que administres tus campamentos sin distracciones."
             session={session}
-            organizationName={contextData?.organization?.name ?? undefined}
-            roleName={contextData?.role?.name ?? undefined}
+            organizationName={contextData.organization?.name ?? undefined}
+            roleName={contextData.role?.name ?? undefined}
           />
         </header>
 
