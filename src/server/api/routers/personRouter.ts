@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
+import { ensureUserHasPerson } from "../helpers/ensureUserHasPerson";
 
 export const personRouter = createTRPCRouter({
   createOrUpdatePerson: protectedProcedure
@@ -13,20 +14,15 @@ export const personRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const personId = ctx.user.person_id;
-      if (!personId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "El usuario debe tener una persona asociada para realizar esta acción.",
-        });
-      }
+      const userId = ctx.user.id;
+      const personId = ctx.user.person_id; // Puede ser null para usuarios nuevos
 
+      // Usar una transacción para asegurar que todas las operaciones sean atómicas
       const person = await ctx.db.$transaction(async (prisma) => {
         let p;
 
-        // Si el usuario ya tiene un person_id, actualiza el registro existente
-        if (ctx.user.person_id) {
-          const personId = ctx.user.person_id;
+        if (personId) {
+          // Si el usuario ya tiene un perfil (person_id), lo actualizamos.
           p = await prisma.person.update({
             where: { id: personId },
             data: {
@@ -34,29 +30,30 @@ export const personRouter = createTRPCRouter({
               phone: input.phone,
               emergency_contact: input.emergencyContact,
               birth_date: input.birthDate,
-              updater_id: personId,
+              updater_id: personId, // La persona actualiza su propio registro
             },
           });
         } else {
-          // Si no, crea un nuevo registro de Person
+          // Si el usuario es nuevo y no tiene perfil, lo creamos y lo enlazamos.
+          // 1. Crear el nuevo registro de Persona.
           p = await prisma.person.create({
             data: {
               full_name: input.fullName,
               phone: input.phone,
               emergency_contact: input.emergencyContact,
               birth_date: input.birthDate,
-              // No se puede asignar creator_id aquí porque la persona aún no tiene un usuario asociado
             },
           });
 
-          // Actualiza el registro de User para vincularlo con la nueva Person
+          // 2. Enlazar la nueva Persona al Usuario actual.
           await prisma.user.update({
-            where: { id: ctx.user.id },
+            where: { id: userId },
             data: { person_id: p.id },
           });
 
-          // Ahora que la persona está vinculada, podemos actualizar el creator_id y updater_id
-          await prisma.person.update({
+          // 3. Actualizar los campos de auditoría (creator_id, updater_id) en la nueva Persona.
+          // El patrón en tu esquema sugiere una auto-referencia para el creador.
+          p = await prisma.person.update({
             where: { id: p.id },
             data: {
               creator_id: p.id,
@@ -68,22 +65,15 @@ export const personRouter = createTRPCRouter({
         return p;
       });
 
-      // La sesión se actualizará automáticamente en la siguiente petición gracias
-      // al callback de sesión de better-auth. El frontend fuerza una recarga
-      // completa, lo que garantiza que se realice una nueva petición.
+      // La sesión se actualizará en la siguiente petición. El frontend fuerza una recarga
+      // para asegurar que el middleware y el cliente obtengan la sesión actualizada con el person_id.
       return person;
     }),
 
   // Procedimiento para obtener los datos de una persona
   getPerson: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.user.person_id) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "El usuario no tiene un perfil de persona asociado.",
-      });
-    }
+    const personId = await ensureUserHasPerson(ctx);
 
-    const personId = ctx.user.person_id;
     return ctx.db.person.findUnique({
       where: { id: personId },
     });

@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { ensureUserHasPerson } from "../helpers/ensureUserHasPerson";
 
 const ALL_MODULES = [
   "inicio",
@@ -81,14 +82,7 @@ export const organizationRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.user.person_id) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "El usuario debe tener una persona asociada para crear una organización.",
-        });
-      }
-
-      const personId = ctx.user.person_id;
+      const personId = await ensureUserHasPerson(ctx);
 
       const defaultRoleDefinitions = [
         {
@@ -243,15 +237,18 @@ export const organizationRouter = createTRPCRouter({
   }),
 
   getCurrentContext: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.user.person_id) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "El usuario no tiene una persona asociada.",
-      });
-    }
+    const personId = await ensureUserHasPerson(ctx);
 
-    const personId = ctx.user.person_id;
-    const organizationId = ctx.user.organization_id;
+    // En desarrollo, usar la primera organización disponible si no hay una activa
+    let organizationId: number | string | null | undefined = ctx.user.activeOrganizationId;
+
+    if (!organizationId && process.env.NODE_ENV === "development") {
+      const firstMembership = await ctx.db.organizationMember.findFirst({
+        where: { person_id: personId },
+        include: { organization: true },
+      });
+      organizationId = firstMembership?.organization_id;
+    }
 
     if (!organizationId) {
       return {
@@ -261,11 +258,14 @@ export const organizationRouter = createTRPCRouter({
       };
     }
 
+    // Convertir a número si es string
+    const orgIdNumber = typeof organizationId === "string" ? parseInt(organizationId) : organizationId;
+
     const membership = await ctx.db.organizationMember.findUnique({
       where: {
         person_id_organization_id: {
           person_id: personId,
-          organization_id: organizationId,
+          organization_id: orgIdNumber,
         },
       },
       include: {

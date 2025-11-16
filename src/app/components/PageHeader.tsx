@@ -260,7 +260,21 @@ export function PageHeader({
 
             <DropdownMenuItem asChild>
               <button
-                onClick={() => (session ? signOut() : signIn("google"))}
+                onClick={async () => {
+                  if (session) {
+                    // Siguiendo la documentación de better-auth para sign out
+                    await signOut({
+                      fetchOptions: {
+                        onSuccess: () => {
+                          router.push("/login");
+                        },
+                      },
+                    });
+                  } else {
+                    // Redirigir a la página de login
+                    router.push("/login");
+                  }
+                }}
                 className="w-full cursor-pointer"
               >
                 {session ? (

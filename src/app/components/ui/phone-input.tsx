@@ -14,7 +14,7 @@ interface PhoneNumberInputProps {
   name: string;
   label?: string;
   placeholder?: string;
-  form: UseFormReturn<Record<string, unknown>>;
+  form: UseFormReturn<any>;
 }
 
 export function PhoneNumberInput({

@@ -1,16 +1,4 @@
 -- CreateEnum
-CREATE TYPE "SystemRole" AS ENUM ('SUPERADMIN', 'GROUP_ADMIN', 'UNIT_ADMIN', 'LEADER', 'HELPER', 'GUARDIAN', 'MEMBER');
-
--- CreateEnum
-CREATE TYPE "ScoutBranch" AS ENUM ('CUBS', 'SWALLOWS', 'MIXED_PACK', 'MIXED_FLOCK', 'SCOUTS', 'GUIDES', 'MIXED_TROOP', 'VENTURERS', 'ROVERS', 'MIXED_VENTURE_UNIT', 'CLAN', 'LEADERSHIP', 'HELPERS');
-
--- CreateEnum
-CREATE TYPE "GroupRole" AS ENUM ('MEMBER', 'LEADER', 'GROUP_DIRECTOR', 'HELPER', 'GUARDIAN');
-
--- CreateEnum
-CREATE TYPE "UnitRole" AS ENUM ('LEADER', 'ASSISTANT', 'MEMBER');
-
--- CreateEnum
 CREATE TYPE "AllergySeverity" AS ENUM ('MILD', 'MODERATE', 'SEVERE', 'CRITICAL');
 
 -- CreateEnum
@@ -29,7 +17,7 @@ CREATE TYPE "UtensilCategory" AS ENUM ('KITCHEN', 'SCOUT_MATERIAL', 'CAMPING', '
 CREATE TYPE "MealType" AS ENUM ('BREAKFAST', 'LUNCH', 'DINNER', 'SNACK', 'OTHER');
 
 -- CreateEnum
-CREATE TYPE "UtensilStatus" AS ENUM ('EXCELLENT', 'GOOD', 'FAIR', 'NEEDS_MAINTENANCE', 'UNAVAILABLE');
+CREATE TYPE "UtensilStatus" AS ENUM ('GOOD', 'FAIR', 'NEEDS_MAINTENANCE', 'UNAVAILABLE');
 
 -- CreateEnum
 CREATE TYPE "TaskStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED');
@@ -46,33 +34,40 @@ CREATE TYPE "InvitationStatus" AS ENUM ('PENDING', 'SENT', 'ACCEPTED', 'REJECTED
 -- CreateEnum
 CREATE TYPE "BudgetItemType" AS ENUM ('FOOD', 'TRANSPORT', 'ACCOMMODATION', 'OTHER');
 
+-- CreateEnum
+CREATE TYPE "RoleScope" AS ENUM ('SYSTEM', 'ORGANIZATION', 'UNIT');
+
 -- CreateTable
-CREATE TABLE "Account" (
+CREATE TABLE "account" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
-    "provider" TEXT NOT NULL,
-    "providerAccountId" TEXT NOT NULL,
-    "refresh_token" TEXT,
-    "access_token" TEXT,
-    "expires_at" INTEGER,
-    "token_type" TEXT,
+    "providerId" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "idToken" TEXT,
+    "accessTokenExpiresAt" TIMESTAMP(3),
+    "refreshTokenExpiresAt" TIMESTAMP(3),
     "scope" TEXT,
-    "id_token" TEXT,
-    "session_state" TEXT,
-    "refresh_token_expires_in" INTEGER,
+    "password" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Account_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "account_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "Session" (
+CREATE TABLE "session" (
     "id" TEXT NOT NULL,
-    "sessionToken" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "expires" TIMESTAMP(3) NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "token" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
 
-    CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "session_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -80,15 +75,11 @@ CREATE TABLE "users" (
     "id" TEXT NOT NULL,
     "name" TEXT,
     "email" TEXT,
-    "emailVerified" TIMESTAMP(3),
+    "emailVerified" BOOLEAN,
     "image" TEXT,
-    "system_role" "SystemRole" NOT NULL DEFAULT 'LEADER',
-    "invitation_status" "InvitationStatus",
-    "invitation_token" TEXT,
-    "invitation_sent_at" TIMESTAMP(3),
-    "pending_group_id" INTEGER,
-    "pending_system_role" "SystemRole",
-    "person_id" INTEGER NOT NULL,
+    "person_id" INTEGER,
+    "system_role_id" INTEGER NOT NULL DEFAULT 1,
+    "pending_system_role_id" INTEGER,
     "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -104,9 +95,45 @@ CREATE TABLE "VerificationToken" (
 );
 
 -- CreateTable
-CREATE TABLE "scout_groups" (
+CREATE TABLE "organization_types" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
+    "description" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "organization_types_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "roles" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "scope" "RoleScope" NOT NULL,
+    "description" TEXT,
+    "organization_id" INTEGER,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "roles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "branches" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "organization_id" INTEGER NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "branches_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "organizations" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "type_id" INTEGER NOT NULL,
     "number" INTEGER,
     "district" TEXT,
     "zone" TEXT,
@@ -123,7 +150,7 @@ CREATE TABLE "scout_groups" (
     "creator_id" INTEGER,
     "updater_id" INTEGER,
 
-    CONSTRAINT "scout_groups_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "organizations_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -146,8 +173,8 @@ CREATE TABLE "people" (
 CREATE TABLE "units" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
-    "branch" "ScoutBranch" NOT NULL,
-    "group_id" INTEGER NOT NULL,
+    "organization_id" INTEGER NOT NULL,
+    "branch_id" INTEGER NOT NULL,
     "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -165,7 +192,7 @@ CREATE TABLE "camps" (
     "start_date" DATE NOT NULL,
     "end_date" DATE NOT NULL,
     "fee_cost" DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    "group_id" INTEGER NOT NULL,
+    "organization_id" INTEGER NOT NULL,
     "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -176,20 +203,20 @@ CREATE TABLE "camps" (
 );
 
 -- CreateTable
-CREATE TABLE "person_groups" (
+CREATE TABLE "organization_members" (
     "person_id" INTEGER NOT NULL,
-    "group_id" INTEGER NOT NULL,
-    "group_role" "GroupRole" NOT NULL,
+    "organization_id" INTEGER NOT NULL,
+    "role_id" INTEGER NOT NULL,
     "assigned_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "person_groups_pkey" PRIMARY KEY ("person_id","group_id")
+    CONSTRAINT "organization_members_pkey" PRIMARY KEY ("person_id","organization_id")
 );
 
 -- CreateTable
 CREATE TABLE "unit_assistants" (
     "unit_id" INTEGER NOT NULL,
     "assistant_id" INTEGER NOT NULL,
-    "role" "UnitRole" NOT NULL DEFAULT 'MEMBER',
+    "role_id" INTEGER NOT NULL,
     "assigned_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "unit_assistants_pkey" PRIMARY KEY ("unit_id","assistant_id")
@@ -273,7 +300,7 @@ CREATE TABLE "ingredients" (
     "is_common_allergen" BOOLEAN NOT NULL DEFAULT false,
     "description" TEXT,
     "observations" TEXT,
-    "group_id" INTEGER NOT NULL,
+    "organization_id" INTEGER NOT NULL,
     "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -294,7 +321,7 @@ CREATE TABLE "dishes" (
     "preparation_time_min" INTEGER,
     "difficulty" TEXT,
     "present_allergens" TEXT,
-    "group_id" INTEGER NOT NULL,
+    "organization_id" INTEGER NOT NULL,
     "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -348,7 +375,7 @@ CREATE TABLE "utensils" (
     "location" TEXT,
     "acquisition_date" DATE,
     "observations" TEXT,
-    "group_id" INTEGER,
+    "organization_id" INTEGER,
     "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -479,7 +506,7 @@ CREATE TABLE "providers" (
     "contact_person" TEXT,
     "description" TEXT,
     "observations" TEXT,
-    "group_id" INTEGER,
+    "organization_id" INTEGER,
     "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -592,17 +619,26 @@ CREATE TABLE "emergency_contacts" (
     CONSTRAINT "emergency_contacts_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE UNIQUE INDEX "Account_provider_providerAccountId_key" ON "Account"("provider", "providerAccountId");
+-- CreateTable
+CREATE TABLE "verification" (
+    "id" TEXT NOT NULL,
+    "identifier" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "verification_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Session_sessionToken_key" ON "Session"("sessionToken");
+CREATE UNIQUE INDEX "account_providerId_accountId_key" ON "account"("providerId", "accountId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "session_token_key" ON "session"("token");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "users_invitation_token_key" ON "users"("invitation_token");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_person_id_key" ON "users"("person_id");
@@ -614,31 +650,55 @@ CREATE UNIQUE INDEX "VerificationToken_token_key" ON "VerificationToken"("token"
 CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationToken"("identifier", "token");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "scout_groups_name_key" ON "scout_groups"("name");
+CREATE UNIQUE INDEX "organization_types_name_key" ON "organization_types"("name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ingredients_name_group_id_key" ON "ingredients"("name", "group_id");
+CREATE UNIQUE INDEX "roles_name_organization_id_key" ON "roles"("name", "organization_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "dishes_name_group_id_key" ON "dishes"("name", "group_id");
+CREATE UNIQUE INDEX "branches_name_organization_id_key" ON "branches"("name", "organization_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "organizations_name_key" ON "organizations"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ingredients_name_organization_id_key" ON "ingredients"("name", "organization_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "dishes_name_organization_id_key" ON "dishes"("name", "organization_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "budgets_camp_id_key" ON "budgets"("camp_id");
 
 -- AddForeignKey
-ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "account" ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "session" ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "users" ADD CONSTRAINT "users_person_id_fkey" FOREIGN KEY ("person_id") REFERENCES "people"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "users" ADD CONSTRAINT "users_person_id_fkey" FOREIGN KEY ("person_id") REFERENCES "people"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "scout_groups" ADD CONSTRAINT "scout_groups_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "users" ADD CONSTRAINT "users_system_role_id_fkey" FOREIGN KEY ("system_role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "scout_groups" ADD CONSTRAINT "scout_groups_updater_id_fkey" FOREIGN KEY ("updater_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "users" ADD CONSTRAINT "users_pending_system_role_id_fkey" FOREIGN KEY ("pending_system_role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "roles" ADD CONSTRAINT "roles_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "branches" ADD CONSTRAINT "branches_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "organizations" ADD CONSTRAINT "organizations_type_id_fkey" FOREIGN KEY ("type_id") REFERENCES "organization_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "organizations" ADD CONSTRAINT "organizations_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "organizations" ADD CONSTRAINT "organizations_updater_id_fkey" FOREIGN KEY ("updater_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "people" ADD CONSTRAINT "people_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -647,13 +707,19 @@ ALTER TABLE "people" ADD CONSTRAINT "people_creator_id_fkey" FOREIGN KEY ("creat
 ALTER TABLE "people" ADD CONSTRAINT "people_updater_id_fkey" FOREIGN KEY ("updater_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "units" ADD CONSTRAINT "units_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "units" ADD CONSTRAINT "units_branch_id_fkey" FOREIGN KEY ("branch_id") REFERENCES "branches"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "units" ADD CONSTRAINT "units_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "units" ADD CONSTRAINT "units_updater_id_fkey" FOREIGN KEY ("updater_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "units" ADD CONSTRAINT "units_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "scout_groups"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "camps" ADD CONSTRAINT "camps_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "camps" ADD CONSTRAINT "camps_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -662,13 +728,16 @@ ALTER TABLE "camps" ADD CONSTRAINT "camps_creator_id_fkey" FOREIGN KEY ("creator
 ALTER TABLE "camps" ADD CONSTRAINT "camps_updater_id_fkey" FOREIGN KEY ("updater_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "camps" ADD CONSTRAINT "camps_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "scout_groups"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "organization_members" ADD CONSTRAINT "organization_members_person_id_fkey" FOREIGN KEY ("person_id") REFERENCES "people"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "person_groups" ADD CONSTRAINT "person_groups_person_id_fkey" FOREIGN KEY ("person_id") REFERENCES "people"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "organization_members" ADD CONSTRAINT "organization_members_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "person_groups" ADD CONSTRAINT "person_groups_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "scout_groups"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "organization_members" ADD CONSTRAINT "organization_members_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "unit_assistants" ADD CONSTRAINT "unit_assistants_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "unit_assistants" ADD CONSTRAINT "unit_assistants_unit_id_fkey" FOREIGN KEY ("unit_id") REFERENCES "units"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -713,22 +782,22 @@ ALTER TABLE "medical_info" ADD CONSTRAINT "medical_info_updater_id_fkey" FOREIGN
 ALTER TABLE "medical_info" ADD CONSTRAINT "medical_info_person_id_fkey" FOREIGN KEY ("person_id") REFERENCES "people"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "ingredients" ADD CONSTRAINT "ingredients_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "ingredients" ADD CONSTRAINT "ingredients_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ingredients" ADD CONSTRAINT "ingredients_updater_id_fkey" FOREIGN KEY ("updater_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ingredients" ADD CONSTRAINT "ingredients_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "scout_groups"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "dishes" ADD CONSTRAINT "dishes_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "dishes" ADD CONSTRAINT "dishes_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "dishes" ADD CONSTRAINT "dishes_updater_id_fkey" FOREIGN KEY ("updater_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "dishes" ADD CONSTRAINT "dishes_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "scout_groups"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "dish_ingredients" ADD CONSTRAINT "dish_ingredients_dish_id_fkey" FOREIGN KEY ("dish_id") REFERENCES "dishes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -752,13 +821,13 @@ ALTER TABLE "camp_menus" ADD CONSTRAINT "camp_menus_dish_id_fkey" FOREIGN KEY ("
 ALTER TABLE "camp_menus" ADD CONSTRAINT "camp_menus_activity_id_fkey" FOREIGN KEY ("activity_id") REFERENCES "activities"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "utensils" ADD CONSTRAINT "utensils_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "utensils" ADD CONSTRAINT "utensils_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "utensils" ADD CONSTRAINT "utensils_updater_id_fkey" FOREIGN KEY ("updater_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "utensils" ADD CONSTRAINT "utensils_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "scout_groups"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "dish_utensils" ADD CONSTRAINT "dish_utensils_dish_id_fkey" FOREIGN KEY ("dish_id") REFERENCES "dishes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -812,13 +881,13 @@ ALTER TABLE "activities" ADD CONSTRAINT "activities_camp_id_fkey" FOREIGN KEY ("
 ALTER TABLE "activities" ADD CONSTRAINT "activities_leader_responsible_id_fkey" FOREIGN KEY ("leader_responsible_id") REFERENCES "people"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "providers" ADD CONSTRAINT "providers_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organizations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "providers" ADD CONSTRAINT "providers_creator_id_fkey" FOREIGN KEY ("creator_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "providers" ADD CONSTRAINT "providers_updater_id_fkey" FOREIGN KEY ("updater_id") REFERENCES "users"("person_id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "providers" ADD CONSTRAINT "providers_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "scout_groups"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ingredient_prices" ADD CONSTRAINT "ingredient_prices_ingredient_id_fkey" FOREIGN KEY ("ingredient_id") REFERENCES "ingredients"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
