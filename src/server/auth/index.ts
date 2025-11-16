@@ -1,10 +1,10 @@
-import NextAuth from "next-auth";
-import { cache } from "react";
-
+import { betterAuth } from "better-auth";
+import { toNextJsHandler } from "better-auth/next-js";
 import { authConfig } from "./config";
 
-const { auth: uncachedAuth, handlers, signIn, signOut } = NextAuth(authConfig);
+export const auth = betterAuth(authConfig);
 
-const auth = cache(uncachedAuth);
+export const { GET, POST } = toNextJsHandler(auth.handler);
 
-export { auth, handlers, signIn, signOut };
+export const { signIn, signOut } = auth.api;
+

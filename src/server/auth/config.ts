@@ -1,43 +1,11 @@
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import {
-  type Adapter,
-  type AdapterUser,
-} from "next-auth/adapters";
-import { type DefaultSession, type NextAuthConfig } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import CredentialsProvider from "next-auth/providers/credentials";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 
 import { db } from "~/server/db";
 
 /**
- * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
- * object and keep type safety.
+ * Options for BetterAuth.js used to configure adapters, providers, callbacks, etc.
  *
- * @see https://next-auth.js.org/getting-started/typescript#module-augmentation
- */
-declare module "next-auth" {
-  interface Session extends DefaultSession {
-    user: {
-      id: string;
-      person_id: number;
-      organization_id?: number;
-      organization_name?: string;
-      role_name?: string;
-      // ...other properties
-      // role: UserRole;
-    } & DefaultSession["user"];
-  }
-
-  // interface User {
-  //   // ...other properties
-  //   // role: UserRole;
-  // }
-}
-
-/**
- * Options for NextAuth.js used to configure adapters, providers, callbacks, etc.
- *
- * @see https://next-auth.js.org/configuration/options
+ * @see https://docs.better-auth.com/configuration/options
  */
 const AUTHORIZED_EMAIL = "nuxapower@gmail.com";
 const SUPERADMIN_FULL_NAME = "Alonso Burón";
@@ -65,113 +33,40 @@ async function ensureSuperadminRole() {
   });
 }
 
-type SignInCallback = NonNullable<
-  NonNullable<NextAuthConfig["callbacks"]>["signIn"]
->;
-
-type SignInCallbackParams = Parameters<SignInCallback>[0];
-
-const baseAdapter = PrismaAdapter(db);
-
-const adapter: Adapter = {
-  ...baseAdapter,
-  async createUser(data) {
-    const isAuthorizedSuperadmin =
-      typeof data.email === "string" &&
-      data.email.toLowerCase() === AUTHORIZED_EMAIL;
-
-    const fullName = isAuthorizedSuperadmin
-      ? SUPERADMIN_FULL_NAME
-      : data.name ?? data.email ?? "Usuario sin nombre";
-
-    // 1. Crear la Persona primero para obtener su ID
-    const person = await db.person.create({
-      data: {
-        full_name: fullName,
-      },
-    });
-
-    // 2. Crear el Usuario, vinculándolo a la Persona recién creada
-    let systemRoleId: number | undefined;
-
-    if (isAuthorizedSuperadmin) {
-      const superadminRole = await ensureSuperadminRole();
-      systemRoleId = superadminRole.id;
-    }
-
-    const user = await db.user.create({
-      data: {
-        ...data,
-        name: fullName,
-        person_id: person.id, // Asignar el ID de la persona recién creada
-        ...(systemRoleId ? { system_role_id: systemRoleId } : {}),
-      },
-    });
-
-    return user as AdapterUser;
-  },
-};
-
-// Configurar los proveedores de autenticación
-const authProviders: NextAuthConfig["providers"] = [
-  GoogleProvider({
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  }),
-];
-
-// En desarrollo, añadir el proveedor de personificación
-if (process.env.NODE_ENV === "development") {
-  authProviders.push(
-    CredentialsProvider({
-      id: "impersonate",
-      name: "Impersonate",
-      credentials: {
-        userId: { label: "User ID", type: "text" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.userId || typeof credentials.userId !== "string") {
-          return null;
-        }
-
-        // Buscar el usuario en la base de datos por su ID
-        const user = await db.user.findUnique({
-          where: { id: credentials.userId },
-        });
-
-        // Si el usuario existe, NextAuth creará la sesión automáticamente
-        if (user) {
-          return user as AdapterUser;
-        }
-
-        return null;
-      },
-    }),
-  );
-}
-
 export const authConfig = {
-  providers: authProviders,
-  adapter,
+  database: prismaAdapter(db, {
+    provider: "postgresql",
+  }),
   session: {
     // Database sessions - control total y revocación inmediata
     strategy: "database",
     maxAge: 30 * 24 * 60 * 60, // 30 días
   },
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    },
+  },
   callbacks: {
-    async signIn({ account, profile }: SignInCallbackParams) {
+    async signIn({ account, profile }: { account: any; profile: any }) {
       // Permitir autenticación del proveedor de personificación en desarrollo
-      if (account?.provider === "impersonate" && process.env.NODE_ENV === "development") {
+      if (
+        account?.providerId === "impersonate" &&
+        process.env.NODE_ENV === "development"
+      ) {
         return true;
       }
 
-      if (account?.provider !== "google") {
+      if (account?.providerId !== "google") {
         return false;
       }
 
       const email = typeof profile?.email === "string" ? profile.email : undefined;
       const emailVerified =
-        typeof profile?.email_verified === "boolean" ? profile.email_verified : false;
+        typeof profile?.email_verified === "boolean"
+          ? profile.email_verified
+          : false;
 
       // Solo permitimos el acceso al correo autorizado y verificado.
       if (!emailVerified || email !== AUTHORIZED_EMAIL) {
@@ -191,7 +86,10 @@ export const authConfig = {
         });
 
         if (existingUser) {
-          if (existingUser.system_role_id !== superadminRole.id || existingUser.name !== SUPERADMIN_FULL_NAME) {
+          if (
+            existingUser.system_role_id !== superadminRole.id ||
+            existingUser.name !== SUPERADMIN_FULL_NAME
+          ) {
             await db.user.update({
               where: { id: existingUser.id },
               data: {
@@ -202,7 +100,7 @@ export const authConfig = {
           }
 
           await db.person.update({
-            where: { id: existingUser.person_id },
+            where: { id: existingUser.person_id ?? undefined },
             data: { full_name: SUPERADMIN_FULL_NAME },
           });
         }
@@ -210,46 +108,20 @@ export const authConfig = {
 
       return true;
     },
-    session: async ({ session, user }) => {
-      // OPTIMIZACIÓN: Una sola query con todos los datos necesarios
-      // En lugar de múltiples queries pequeñas, hacemos una grande y eficiente
-      const dbUser = await db.user.findUnique({
-        where: { id: user.id },
-        select: {
-          person_id: true,
-          person: {
-            select: {
-              organizations: {
-                select: { 
-                  organization_id: true,
-                  organization: {
-                    select: { name: true }
-                  },
-                  role: {
-                    select: { name: true }
-                  }
-                },
-                take: 1, // Solo la primera organización
-                orderBy: { assigned_at: 'asc' }
-              },
-            },
-          },
-        },
-      });
-      
-      const primaryOrg = dbUser?.person?.organizations[0];
-      
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          id: user.id,
-          person_id: dbUser?.person_id,
-          organization_id: primaryOrg?.organization_id,
-          organization_name: primaryOrg?.organization.name,
-          role_name: primaryOrg?.role.name,
-        },
-      };
+    async session({ session, user }) {
+      // Asegúrate de que person_id esté siempre actualizado en la sesión
+      if (user.id) {
+        const dbUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: { person_id: true, system_role: { select: { name: true } } },
+        });
+
+        if (dbUser) {
+          session.user.person_id = dbUser.person_id;
+          session.user.role_name = dbUser.system_role?.name || null;
+        }
+      }
+      return session;
     },
   },
-} satisfies NextAuthConfig;
+};

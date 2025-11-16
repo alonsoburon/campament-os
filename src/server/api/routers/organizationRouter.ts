@@ -81,14 +81,13 @@ export const organizationRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const personId = ctx.session.user.person_id;
-
-      if (!personId) {
+      if (!ctx.user.person_id) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "El usuario no tiene una persona asociada.",
         });
       }
+      const personId = ctx.user.person_id;
 
       const defaultRoleDefinitions = [
         {
@@ -241,7 +240,7 @@ export const organizationRouter = createTRPCRouter({
           foundation_date: input.foundation_date,
           primary_color: input.primary_color,
           secondary_color: input.secondary_color,
-          updater_id: ctx.session.user.person_id, // Actualizar el actualizador
+          updater_id: ctx.user.person_id ?? undefined, // Actualizar el actualizador
         },
       });
       return organization;
@@ -254,10 +253,10 @@ export const organizationRouter = createTRPCRouter({
   }),
 
   getCurrentContext: protectedProcedure.query(async ({ ctx }) => {
-    const personId = ctx.session.user.person_id;
-    const organizationId = ctx.session.user.organization_id;
-    const organizationName = ctx.session.user.organization_name;
-    const roleName = ctx.session.user.role_name;
+    const personId = ctx.user.person_id;
+    const organizationId = ctx.user.organization_id;
+    const organizationName = ctx.user.organization_name;
+    const roleName = ctx.user.role_name;
 
     if (!personId) {
       throw new TRPCError({

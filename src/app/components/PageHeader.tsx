@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import type { Session } from "next-auth";
-import { signIn } from "next-auth/react";
+import type { Session } from "@better-auth/next";
+import { signIn, signOut } from "~/lib/auth-client";
 import { LogOut, LogIn, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -23,8 +23,6 @@ type PageHeaderProps = {
   description?: string;
   badgeLabel?: string;
   session: Session | null;
-  signInAction: () => Promise<void>;
-  signOutAction: () => Promise<void>;
   organizationName?: string;
   roleName?: string;
 };
@@ -34,8 +32,6 @@ export function PageHeader({
   description,
   badgeLabel,
   session,
-  signInAction,
-  signOutAction,
   organizationName,
   roleName,
 }: PageHeaderProps) {
@@ -68,10 +64,10 @@ export function PageHeader({
       setSwitchingUserId(userId);
 
       try {
-        // Usar signIn con el proveedor de personificación
-        const result = await signIn("impersonate", {
+        // Usar signIn con el proveedor de credenciales para personificación en dev
+        const result = await signIn("credentials", {
           redirect: false, // Evitar recarga completa de la página
-          userId: userId,
+          userId,
         });
 
         if (result?.error) {
@@ -244,10 +240,10 @@ export function PageHeader({
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1.5">
                     <p className="text-sm font-semibold leading-none">
-                      {session.user.name ?? "Usuario"}
+                      {session?.user?.name ?? "Usuario"}
                     </p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {session.user.email}
+                      {session?.user?.email ?? ""}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -259,23 +255,24 @@ export function PageHeader({
               </DropdownMenuLabel>
             )}
 
-            <form action={session ? signOutAction : signInAction}>
-              <DropdownMenuItem asChild>
-                <button type="submit" className="w-full cursor-pointer">
-                  {session ? (
-                    <>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Cerrar sesión</span>
-                    </>
-                  ) : (
-                    <>
-                      <LogIn className="mr-2 h-4 w-4" />
-                      <span>Iniciar sesión</span>
-                    </>
-                  )}
-                </button>
-              </DropdownMenuItem>
-            </form>
+            <DropdownMenuItem asChild>
+              <button
+                onClick={() => (session ? signOut() : signIn("google"))}
+                className="w-full cursor-pointer"
+              >
+                {session ? (
+                  <>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Cerrar sesión</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="mr-2 h-4 w-4" />
+                    <span>Iniciar sesión</span>
+                  </>
+                )}
+              </button>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

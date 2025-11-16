@@ -56,7 +56,7 @@ const PRIORITY_MAP = {
 
 export const dashboardRouter = createTRPCRouter({
   overview: protectedProcedure.query(async ({ ctx }) => {
-    const organizationId = ctx.session.user.organization_id;
+    const organizationId = ctx.user.organization_id;
 
     if (!organizationId) {
       return {
@@ -347,6 +347,67 @@ export const dashboardRouter = createTRPCRouter({
         pendingPaymentsAmount,
         criticalTasksCount,
       },
+    };
+  }),
+  getSummary: protectedProcedure.query(async ({ ctx }) => {
+    // reutilizar la lógica de overview pero devolviendo solo el resumen
+    const organizationId = ctx.user.organization_id;
+    if (!organizationId) {
+      return {
+        upcomingCampsCount: 0,
+        activeParticipants: 0,
+        pendingPaymentsCount: 0,
+        pendingPaymentsAmount: 0,
+        criticalTasksCount: 0,
+      };
+    }
+
+    const now = new Date();
+    const nextMonth = new Date(now);
+    nextMonth.setDate(now.getDate() + 30);
+
+    const [upcomingCampsCount, activeParticipants, pendingParticipations, tasksRaw] = await Promise.all([
+      ctx.db.camp.count({
+        where: {
+          organization_id: organizationId,
+          start_date: { gte: now, lte: nextMonth },
+        },
+      }),
+      ctx.db.organizationMember.count({ where: { organization_id: organizationId } }),
+      ctx.db.campParticipation.findMany({
+        where: { payment_made: false, camp: { organization_id: organizationId } },
+        include: { camp: { select: { fee_cost: true } } },
+      }),
+      ctx.db.task.findMany({
+        where: { camp: { organization_id: organizationId }, status: { in: ["PENDING", "IN_PROGRESS"] } },
+        select: { priority: true, due_date: true },
+      }),
+    ]);
+
+    const pendingPaymentsAmount = pendingParticipations.reduce(
+      (acc, p) => acc + (p.camp?.fee_cost ?? 0),
+      0,
+    );
+    const pendingPaymentsCount = pendingParticipations.length;
+
+    const differenceInCalendarDays = (from: Date, to: Date) => {
+      const start = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+      const end = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
+      return Math.round((end - start) / (1000 * 60 * 60 * 24));
+    };
+
+    const criticalTasksCount = tasksRaw.filter((task) => {
+      const high = task.priority === "URGENT" || task.priority === "HIGH";
+      const soon = task.due_date ? differenceInCalendarDays(now, task.due_date) <= 2 : false;
+      return high || soon;
+    }).length;
+
+    return {
+      upcomingCampsCount,
+      activeParticipants,
+      pendingPaymentsCount,
+      pendingPaymentsAmount,
+      criticalTasksCount,
     };
   }),
 });

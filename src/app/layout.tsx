@@ -1,6 +1,6 @@
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
-import { SessionProvider } from "next-auth/react";
+// Sin provider de sesión: better-auth/react no lo requiere
 
 import "~/styles/globals.css";
 
@@ -27,13 +27,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={geist.variable} suppressHydrationWarning>
       <body className="bg-background font-sans text-foreground antialiased">
-        <SessionProvider>
-          <ThemeProvider>
-            <TRPCReactProvider>
-              <AppShellWrapper>{children}</AppShellWrapper>
-            </TRPCReactProvider>
-          </ThemeProvider>
-        </SessionProvider>
+        <ThemeProvider>
+          <TRPCReactProvider>
+            <AppShellWrapper>{children}</AppShellWrapper>
+          </TRPCReactProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

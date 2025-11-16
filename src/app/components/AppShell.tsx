@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { Session } from "next-auth";
+import type { Session } from "@better-auth/next";
 import { useRouter, usePathname } from "next/navigation";
 
 import { api } from "~/trpc/react";
@@ -31,15 +31,11 @@ const ALL_MODULE_IDS = [
 
 type AppShellProps = {
   session: Session | null;
-  signInAction: () => Promise<void>;
-  signOutAction: () => Promise<void>;
   children: React.ReactNode;
 };
 
 export function AppShell({
   session,
-  signInAction,
-  signOutAction,
   children,
 }: AppShellProps) {
   const router = useRouter();
@@ -126,8 +122,6 @@ export function AppShell({
             title={currentTitle}
             description="CampamentOS prioriza información clara y organizada para que administres tus campamentos sin distracciones."
             session={session}
-            signInAction={signInAction}
-            signOutAction={signOutAction}
             organizationName={contextData?.organization?.name ?? undefined}
             roleName={contextData?.role?.name ?? undefined}
           />

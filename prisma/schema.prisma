@@ -16,52 +16,55 @@ datasource db {
 // ============================================================================
 
 model Account {
-  id                       String  @id @default(cuid())
-  userId                   String
-  type                     String
-  provider                 String
-  providerAccountId        String
-  refresh_token            String? // @db.Text
-  access_token             String? // @db.Text
-  expires_at               Int?
-  token_type               String?
-  scope                    String?
-  id_token                 String? // @db.Text
-  session_state            String?
-  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  refresh_token_expires_in Int?
+  id                    String    @id @default(cuid())
+  userId                String
+  providerId            String
+  accountId             String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([provider, providerAccountId])
+  @@unique([providerId, accountId])
+  @@map("account")
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
 }
 
 model User {
-  id                 String            @id @default(cuid())
+  id                 String    @id @default(cuid())
   name               String?
-  email              String?           @unique
-  emailVerified      DateTime?
+  email              String?   @unique
+  emailVerified      Boolean?
   image              String?
   accounts           Account[]
   sessions           Session[]
-  invitation_status  InvitationStatus?
-  invitation_token   String?           @unique
-  invitation_sent_at DateTime?
-  pending_group_id   Int?
-  person_id          Int               @unique
-  person             Person            @relation(fields: [person_id], references: [id])
+  person_id          Int?      @unique
+  person             Person?   @relation(fields: [person_id], references: [id])
 
   // --- MODIFIED: SystemRole enum replaced by relation to Role model ---
-  system_role_id         Int @default(1) // Añadir un valor por defecto para las filas existentes
-  system_role            Role  @relation("UserSystemRoles", fields: [system_role_id], references: [id])
+  system_role_id      Int   @default(1) // Añadir un valor por defecto para las filas existentes
+  system_role         Role  @relation("UserSystemRoles", fields: [system_role_id], references: [id])
   pending_system_role_id Int?
-  pending_system_role    Role? @relation("UserPendingRoles", fields: [pending_system_role_id], references: [id])
+  pending_system_role Role? @relation("UserPendingRoles", fields: [pending_system_role_id], references: [id])
 
   // Audit
   deleted_at DateTime?
@@ -267,6 +270,7 @@ model Branch {
 // ============================================================================
 
 // --- NEW: Replaces ScoutGroup for a generic structure ---
+
 model Organization {
   id              Int                  @id @default(autoincrement())
   name            String               @unique
@@ -394,6 +398,7 @@ model Camp {
 // ============================================================================
 
 // --- MODIFIED: Renamed from PersonGroup, uses Organization and Role models ---
+
 model OrganizationMember {
   person_id       Int
   organization_id Int
@@ -910,4 +915,15 @@ model EmergencyContact {
   camp              Camp      @relation(fields: [camp_id], references: [id])
 
   @@map("emergency_contacts")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
 }

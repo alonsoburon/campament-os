@@ -13,52 +13,28 @@ import { ZodError } from "zod";
 
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
-import { uncachedAuth } from "~/server/auth";
 
-/**
- * 1. CONTEXT
- *
- * This section defines the "contexts" that are available in the backend API.
- *
- * These allow you to access things when processing a request, like the database, the session, etc.
- *
- * This helper generates the "internals" for a tRPC context. The API handler and RSC clients each
- * wrap this and provides the required context.
- *
- * @see https://trpc.io/docs/server/context
- */
+// Tipos derivados de la sesión de Better Auth, extendidos con campos extra usados en la app
+type SessionResult = Awaited<ReturnType<typeof auth.api.getSession>>;
+type SessionUserExtra = {
+  person_id?: number | null;
+  organization_id?: number | null;
+  organization_name?: string | null;
+  role_name?: string | null;
+};
+type SessionUser = (SessionResult extends { user: infer U } ? U : never) & SessionUserExtra;
+
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  // Usar uncachedAuth para evitar problemas con el cache de React
-  // que puede cachear sesiones incorrectas después del switch de usuario
-  const session = await uncachedAuth();
-  
-  // Debug logging en desarrollo
-  if (process.env.NODE_ENV === "development") {
-    const cookieHeader = opts.headers.get("cookie");
-    const hasSessionCookie = cookieHeader?.includes("authjs.session-token") || cookieHeader?.includes("__Secure-authjs.session-token");
-    console.log("[tRPC Context] Session exists:", !!session);
-    console.log("[tRPC Context] Has session cookie:", hasSessionCookie);
-    if (session?.user) {
-      console.log("[tRPC Context] User ID:", session.user.id);
-    } else {
-      console.log("[tRPC Context] No user in session");
-    }
-  }
+  const session = await auth.api.getSession({ headers: opts.headers });
+  const user = (session?.user ?? undefined) as SessionUser | undefined;
 
   return {
     db,
-    session,
-    ...opts,
+    user,
+    resHeaders: new Headers(),
   };
 };
 
-/**
- * 2. INITIALIZATION
- *
- * This is where the tRPC API is initialized, connecting the context and transformer. We also parse
- * ZodErrors so that you get typesafety on the frontend if your procedure fails due to validation
- * errors on the backend.
- */
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
@@ -73,122 +49,54 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
   },
 });
 
-/**
- * Create a server-side caller.
- *
- * @see https://trpc.io/docs/server/server-side-calls
- */
 export const createCallerFactory = t.createCallerFactory;
-
-/**
- * 3. ROUTER & PROCEDURE (THE IMPORTANT BIT)
- *
- * These are the pieces you use to build your tRPC API. You should import these a lot in the
- * "/src/server/api/routers" directory.
- */
-
-/**
- * This is how you create new routers and sub-routers in your tRPC API.
- *
- * @see https://trpc.io/docs/router
- */
 export const createTRPCRouter = t.router;
+export const publicProcedure = t.procedure;
 
-/**
- * Middleware for timing procedure execution and adding an artificial delay in development.
- *
- * You can remove this if you don't like it, but it can help catch unwanted waterfalls by simulating
- * network latency that would occur in production but not in local development.
- */
-const timingMiddleware = t.middleware(async ({ next, path }) => {
-  const start = Date.now();
-
-  if (t._config.isDev) {
-    // artificial delay in dev
-    const waitMs = Math.floor(Math.random() * 400) + 100;
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
+export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+  if (!ctx.user?.id) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
   }
-
-  const result = await next();
-
-  const end = Date.now();
-  console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
-
-  return result;
+  return next({
+    ctx: { ...ctx, user: ctx.user },
+  });
 });
 
-/**
- * Public (unauthenticated) procedure
- *
- * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
- * guarantee that a user querying is authorized, but you can still access user session data if they
- * are logged in.
- */
-export const publicProcedure = t.procedure.use(timingMiddleware);
+export const orgProtectedProcedure = protectedProcedure.use(
+  async ({ ctx, next, input }) => {
+    const inputAsOrgContext = input as { organization_id?: number };
+    const inputOrganizationId = inputAsOrgContext.organization_id;
 
-/**
- * Protected (authenticated) procedure
- *
- * If you want a query or mutation to ONLY be accessible to logged in users, use this. It verifies
- * the session is valid and guarantees `ctx.session.user` is not null.
- *
- * @see https://trpc.io/docs/procedures
- */
-export const protectedProcedure = t.procedure
-  .use(timingMiddleware)
-  .use(({ ctx, next }) => {
-    if (!ctx.session?.user) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
+    if (inputOrganizationId) {
+      if (!ctx.user.organization_id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "No tienes permiso para acceder a esta organización.",
+        });
+      }
+
+      const sessionOrgId = ctx.user.organization_id;
+      if (inputOrganizationId !== sessionOrgId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "No tienes permiso para acceder a esta organización.",
+        });
+      }
     }
-    return next({
-      ctx: {
-        // infers the `session` as non-nullable
-        session: { ...ctx.session, user: ctx.session.user },
-      },
-    });
+
+    return next({ ctx });
+  },
+);
+
+export const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  const user = await ctx.db.user.findUnique({
+    where: { id: ctx.user.id },
+    include: { system_role: true },
   });
 
-/**
- * Protected (authenticated and organization-scoped) procedure
- *
- * If you want a query or mutation to ONLY be accessible to logged in users
- * who belong to a specific organization, use this. It verifies the session is valid,
- * guarantees `ctx.session.user` is not null, and validates `organizationId` from the input.
- */
-export const organizationProcedure = protectedProcedure.use(
-  t.middleware(async ({ ctx, next, input }) => {
-    if (!ctx.session) { // Comprobación explícita para asegurar que ctx.session no es nulo
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "Sesión no encontrada o inválida.",
-      });
-    }
+  if (user?.system_role?.name !== "Superadmin") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
 
-    if (!ctx.session.user.organization_id) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "El usuario no está asociado a ninguna organización.",
-      });
-    }
-
-    // Asumimos que el input del procedimiento tendrá una propiedad 'organizationId'
-    // o que el procedimiento se encargará de obtenerlo de alguna otra forma.
-    // Para simplificar, validamos directamente si el input tiene organizationId
-    // y si coincide con el del usuario en sesión.
-    const inputOrganizationId = (input as { organizationId?: number })?.organizationId;
-
-    if (inputOrganizationId && inputOrganizationId !== ctx.session.user.organization_id) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Acceso denegado: el usuario no pertenece a la organización especificada.",
-      });
-    }
-
-    return next({
-      ctx: {
-        // Infers the organization_id as non-nullable for procedures using this
-        organizationId: ctx.session.user.organization_id,
-      },
-    });
-  }),
-);
+  return next({ ctx });
+});
