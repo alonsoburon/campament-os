@@ -5,7 +5,7 @@
 
 import * as React from "react";
 import type { Session } from "@better-auth/next";
-import { signIn, signOut } from "~/lib/auth-client";
+import { authClient, signOut } from "~/lib/auth-client";
 import { LogOut, LogIn, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -46,9 +46,15 @@ export function PageHeader({
   const [switchError, setSwitchError] = React.useState<string | null>(null);
   const [isRefreshing, startTransition] = React.useTransition();
   const devSwitchEnabled = process.env.NODE_ENV !== "production";
+  const [menuOpen, setMenuOpen] = React.useState(false);
+
+  const { data: impersonationStatus } = api.user.getImpersonationStatus.useQuery(undefined, {
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
 
   const { data: switchableUsers, isLoading: switchableUsersLoading, error: switchableUsersError } = api.user.listSwitchableUsers.useQuery(undefined, {
-    enabled: devSwitchEnabled,
+    enabled: devSwitchEnabled && menuOpen,
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000,
   });
@@ -65,27 +71,24 @@ export function PageHeader({
       setSwitchingUserId(userId);
 
       try {
-        // Usar signIn con el proveedor de credenciales para personificación en dev
-        const result = await signIn("credentials", {
-          redirect: false, // Evitar recarga completa de la página
-          userId,
-        });
-
-        if (result?.error) {
-          throw new Error("El cambio de sesión falló. Revisa la consola.");
+        const result = await authClient.admin.impersonateUser({ userId });
+        console.log("Impersonation result:", result);
+        
+        if (result.error) {
+          console.error("Impersonation error details:", result.error);
+          throw new Error(result.error.message ?? "Impersonation failed");
         }
 
-        // Invalidar toda la caché de tRPC y refrescar la página
         await utils.invalidate();
         startTransition(() => {
           router.refresh();
         });
       } catch (error) {
-        console.error("Error al cambiar de usuario:", error);
+        console.error("Error al personificar usuario:", error);
         setSwitchError(
           error instanceof Error
             ? error.message
-            : "No se pudo cambiar de usuario.",
+            : "No se pudo personificar el usuario.",
         );
       } finally {
         setSwitchingUserId(null);
@@ -93,6 +96,18 @@ export function PageHeader({
     },
     [devSwitchEnabled, router, startTransition, utils],
   );
+
+  const handleStopImpersonating = React.useCallback(async () => {
+    try {
+      const { error } = await authClient.admin.stopImpersonating({});
+      if (error) throw new Error(error.message ?? "Stop impersonation failed");
+      await utils.invalidate();
+      startTransition(() => router.refresh());
+    } catch (e) {
+      console.error(e);
+      setSwitchError(e instanceof Error ? e.message : "No se pudo finalizar");
+    }
+  }, [router, startTransition, utils]);
 
   function renderMembershipSummary(memberships: {
     organizationName: string | null;
@@ -134,10 +149,17 @@ export function PageHeader({
             {description}
           </p>
         )}
-        {contextLabel && (
-          <p className="text-xs text-muted-foreground/80">
-            {contextLabel}
-          </p>
+        {(contextLabel || impersonationStatus?.isImpersonating) && (
+          <div className="flex items-center gap-2">
+            {contextLabel && (
+              <p className="text-xs text-muted-foreground/80">{contextLabel}</p>
+            )}
+            {impersonationStatus?.isImpersonating && (
+              <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-600 ring-1 ring-inset ring-amber-500/30">
+                Impersonando
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -147,7 +169,7 @@ export function PageHeader({
         <ThemeToggle />
 
         {/* Menú de usuario */}
-        <DropdownMenu>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -234,6 +256,10 @@ export function PageHeader({
                   </div>
                 )}
 
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleStopImpersonating(); }}>
+                  <span className="text-xs">Detener personificación</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
               </>
             )}

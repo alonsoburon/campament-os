@@ -1,5 +1,6 @@
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { db } from "~/server/db";
+import { admin } from "better-auth/plugins";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -13,8 +14,16 @@ export const authConfig = {
   },
   socialProviders: {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
   },
-};
+  plugins: [
+    admin({
+      defaultRole: "user",
+      adminRoles: ["admin", "superadmin"],
+      // ID del usuario nuxapower@gmail.com (visible en los logs del console)
+      adminUserIds: ["MYQFI7qpMxk5ruZ0SSTxXQmYUwI61jX2"],
+    }),
+  ],
+} as const;

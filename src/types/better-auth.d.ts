@@ -34,6 +34,10 @@ declare module "better-auth/react" {
     signIn: any;
     signOut: any;
     getSession: () => Promise<Session | null>;
-    organization: any; // <-- Expone los métodos del plugin
+    organization: any; // <-- Plugin de organización
+    admin: {
+      impersonateUser: (args: { userId: string }) => Promise<{ data?: any; error?: { message?: string } }>;
+      stopImpersonating: (args: Record<string, never>) => Promise<{ data?: any; error?: { message?: string } }>;
+    };
   };
 }

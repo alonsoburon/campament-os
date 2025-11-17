@@ -4,8 +4,20 @@ import { z } from "zod";
 export const campRouter = router({
   listCamps: orgProtectedProcedure
     .input(z.object({ organizationId: z.number() }))
-    .query(async ({ input, ctx }) => { // Añadimos ctx aquí
-      return ctx.db.camp.findMany({ where: { organization_id: input.organizationId } });
+    .query(async ({ input, ctx }) => {
+      return ctx.db.camp.findMany({
+        where: { organization_id: input.organizationId, deleted_at: null },
+        orderBy: { start_date: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          name: true,
+          location: true,
+          start_date: true,
+          end_date: true,
+          fee_cost: true,
+        },
+      });
     }),
 
   getCampById: orgProtectedProcedure

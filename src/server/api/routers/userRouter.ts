@@ -15,6 +15,9 @@ export const userRouter = createTRPCRouter({
       },
     });
   }),
+  getImpersonationStatus: protectedProcedure.query(({ ctx }) => {
+    return { isImpersonating: Boolean((ctx as any).isImpersonating) };
+  }),
   listSwitchableUsers: protectedProcedure.query(async ({ ctx }) => {
     if (process.env.NODE_ENV === "production") {
       return [];

@@ -71,6 +71,22 @@ async function main() {
 
   console.log(`✅ ${orgTypes.length} tipos de organización creados`);
 
+  // 3. Otorgar rol admin a nuxapower@gmail.com si ya existe
+  console.log("📝 Verificando usuario admin...");
+  const adminUser = await prisma.user.findUnique({
+    where: { email: "nuxapower@gmail.com" },
+  });
+
+  if (adminUser) {
+    await prisma.user.update({
+      where: { id: adminUser.id },
+      data: { role: "admin" },
+    });
+    console.log("✅ Rol admin otorgado a nuxapower@gmail.com");
+  } else {
+    console.log("ℹ️  Usuario nuxapower@gmail.com aún no existe. Será admin al iniciar sesión.");
+  }
+
   console.log("\n🎉 Seed básico completado!");
   console.log("\n📌 Próximos pasos:");
   console.log("1. Inicia sesión con Google usando nuxapower@gmail.com");

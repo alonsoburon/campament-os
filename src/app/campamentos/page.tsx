@@ -1,23 +1,61 @@
 "use client";
-import React from 'react';
+import React from "react";
 import { api } from "~/trpc/react";
-import { useOrganization } from "~/app/hooks/useOrganization"; // Importar useOrganization
+import { useOrganization } from "~/app/hooks/useOrganization";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "~/app/components/ui/card";
 import { Button } from "~/app/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/app/components/ui/table";
 import { PlusCircle } from "lucide-react";
+import { Skeleton } from "~/app/components/ui/skeleton";
 
 const CampamentosPage = () => {
   const { organizationId, isLoading: isOrganizationLoading, error: organizationError } = useOrganization();
 
   const { data: camps, isLoading, error } = api.camp.listCamps.useQuery(
-    { organizationId: organizationId! },
-    { enabled: !!organizationId && !isOrganizationLoading }
+    { organizationId: organizationId as number },
+    {
+      enabled: !!organizationId && !isOrganizationLoading,
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    },
   );
 
   if (isLoading || isOrganizationLoading) {
-    return <div className="container mx-auto p-4">Cargando campamentos...</div>;
+    return (
+      <div className="container mx-auto p-4">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="h-8 w-48"><Skeleton className="h-8 w-48" /></div>
+          <Skeleton className="h-9 w-40" />
+        </div>
+        <Card className="mb-6">
+          <CardHeader>
+            <Skeleton className="h-6 w-56" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-64" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="grid grid-cols-5 gap-4">
+                  <Skeleton className="h-5" />
+                  <Skeleton className="h-5" />
+                  <Skeleton className="h-5" />
+                  <Skeleton className="h-5" />
+                  <Skeleton className="h-5" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (organizationError) {

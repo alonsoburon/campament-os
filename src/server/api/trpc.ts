@@ -21,6 +21,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   return {
     db,
     user: session?.user as ContextUser | undefined,
+    isImpersonating: Boolean((session as any)?.session?.impersonatedBy),
     resHeaders: new Headers(),
   };
 };
